@@ -1,18 +1,31 @@
-# McNeuron
-### A Python Pachage for Sampling Neuron Morphology
+ # McNeuron: A Python Package for Sampling Neuron Morphology
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)](https://github.com/BonsaiNet/McNeuron/blob/master/LICENSE)[![Gitter](https://badges.gitter.im/glm-tools/pyglmnet.svg)](https://gitter.im/McNeuron/Lobby)[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.1170488.svg)](https://doi.org/10.5281/zenodo.1170488)
 
-McNeuron is a 'more of this' method for sampling morphologies. It extracts all the desired features from a database of neuron and build a generative model using na{\"i}ve Bayes assumption. Then by starting from a simple neuron (e.g. a neuron with soma only) and perturb it by Reversible-jump Markov Chain Monte Carlo in each iteration, forces it gradually to capture the desired features. We showed that by running this method on various database of morphologies we are able to automatically sample from them.  
+McNeuron is a 'more of this' algorithm for sampling morphologies. 
 
-Contact: Roozbeh Farhoodi [roozbehfarhoodi@gmail.com]
+## Reversible-jump Markov Chain Monte Carlo:
+It extracts all the desired features from a database of neuron and builds a generative model using na{\"i}ve Bayes assumption. Then by starting from a simple neuron (e.g. a neuron with soma only) and perturbing it using Reversible-jump Markov Chain Monte Carlo in each iteration, gradually enriches the morphology with the desired features.  
+
 
 ![alt tag](https://github.com/BonsaiNet/McNeuron/blob/master/github-overview.png)
 
-Reference:
---------------------
-[Sampling Neuron Morphology](https://www.biorxiv.org/content/early/2018/01/15/248385)
-Farhoodi, R, and Kording K. P (2018). bioRxiv
 
-Installation:
---------------------
+## Installation:
+Clone the repository.
+
+```bash
+$ git clone https://github.com/BonsaiNet/McNeuron.git
+```
+To use the algorithm go to the 
+## Dependencies:
+
+- [numpy](http://www.numpy.org/)
+- [matplotlib](http://matplotlib.org/)
+- [scipy](https://www.scipy.org/)
+
+## Reference:
+The preprint (not peer-reviewed) is available at
+[Farhoodi, Roozbeh, and Konrad P. Kording. "Sampling Neuron Morphologies." bioRxiv (2018): 248385.](https://www.biorxiv.org/content/early/2018/01/15/248385)
+
+Contact: Roozbeh Farhoodi [roozbehfarhoodi@gmail.com]
