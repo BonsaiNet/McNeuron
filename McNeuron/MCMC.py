@@ -24,7 +24,7 @@ class MCMC(object):
     neuron: :class: `Neuron`
         The starting neuron, by default it starts with a simple neuron with
         only one soma and one compartment.
-    ## features: list
+    ## features: list 
     ##    The list of all features to perform MCMC. The default is the list of
     features appears in paper ???
     ##    e.g. features = ['Volume', 'length', 'Sholl']
@@ -1135,7 +1135,7 @@ class MCMC(object):
         return x, y
 
     def show_MCMC(self,start,size_x,size_y):
-        fig = plt.figure(figsize=(size_x,size_y))
+        fig = plt.figure(figsize=(size_x,size_y)) 
         gs = gridspec.GridSpec(2,2)
         ax = plt.subplot(gs[0])
         ax.plot(sum(self.trend[:,start:],0));

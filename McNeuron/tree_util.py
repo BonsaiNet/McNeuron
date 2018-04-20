@@ -30,7 +30,7 @@ def dendogram_depth(parent_index):
     depth += 1
     depth[0] = 0
     return depth
-
+    
 def get_parent_index(input_parent, input_type='swc_matrix'):
     if input_type=='swc_matrix':
         parent_index = input_parent[:,6]-1
@@ -41,10 +41,10 @@ def get_parent_index(input_parent, input_type='swc_matrix'):
         parent_index = input_parent.parent_index
 
     return parent_index
-
-def get_index_of_critical_points(input_parent,
-                            input_type='swc_matrix',
-                            n_soma=3,
+    
+def get_index_of_critical_points(input_parent, 
+                            input_type='swc_matrix', 
+                            n_soma=3, 
                             only_one_somatic_node=True):
     """
     Returning the index of branching points and end points.
@@ -54,7 +54,7 @@ def get_index_of_critical_points(input_parent,
     input_parent: the data of parent
         it can have different type according to input_type
     input_type: str
-        it can be 'swc_matrix, 'Neuron_no_featured', 'Neuron_featured' 'parent_index', 'branch_order'
+        it can be 'swc_matrix, 'Neuron_no_featured', 'Neuron_featured' 'parent_index', 'branch_order'  
     n_soma: int
         the number of nodes that represent soma
     only_one_somatic_node: boolean
@@ -76,7 +76,7 @@ def get_index_of_critical_points(input_parent,
         branch_order = np.zeros(len(parent_index))
         unique, counts = np.unique(parent_index[1:], return_counts=True)
         branch_order[unique] = counts
-
+        
     if input_type=='Neuron_featured':
         branch_order = input_parent.features['branch order']
         n_soma = input_parent.n_soma
@@ -87,16 +87,16 @@ def get_index_of_critical_points(input_parent,
         branch_order = np.zeros(len(parent_index))
         unique, counts = np.unique(parent_index[1:], return_counts=True)
         branch_order[unique] = counts
-
+        
     if input_type=='parent_index':
         parent_index = input_parent
         branch_order = np.zeros(len(parent_index))
         unique, counts = np.unique(parent_index[1:], return_counts=True)
         branch_order[unique] = counts
-
+    
     if only_one_somatic_node is False:
         n_soma = 1
-
+        
     (branch_index,) = np.where(branch_order[n_soma:] == 2)
     (endpoint_index,) = np.where(branch_order[n_soma:] == 0)
     selected_index = np.union1d(branch_index + n_soma,
@@ -127,3 +127,4 @@ def parent_id(whole_tree, node_on_subtree, some_selected_node_on_subtree):
         (ind,) = np.where(selected_index == p)
         parent_id = np.append(parent_id, ind)
     return parent_id
+

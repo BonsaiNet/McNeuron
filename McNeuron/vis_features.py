@@ -6,7 +6,7 @@ import McNeuron
 def features_attr(feature, feature_type,
                   title,
                   x_title='',
-                  y_title='',
+                  y_title='', 
                   hist_range='',
                   x_range='',
                   dim=1):
@@ -25,7 +25,7 @@ def features_attr(feature, feature_type,
 
 def feature_ax(feature_list, ax):
     if feature_list['type'] == 'scalar':
-        print(feature_list['title']+': '+str(feature_list['x'][0]))
+        print(feature_list['title']+': '+str(feature_list['x'][0])) 
     else:
         if feature_list['type'] == 'histogram':
             ax.hist(feature_list['x'], feature_list['bins'])
@@ -37,13 +37,13 @@ def feature_ax(feature_list, ax):
                 ax.imshow(np.transpose(np.reshape(feature_list['x'],[10,10])))
         ax.set_title(feature_list['title'])
         ax.set_xlabel(feature_list['xlabel'])
-        ax.set_ylabel(feature_list['ylabel'])
+        ax.set_ylabel(feature_list['ylabel'])    
 
 def set_feature_to_show(neuron):
     list_features = {}
     names = neuron.features.keys()
     for name in names:
-        if(name in ['all non trivial initials',
+        if(name in ['all non trivial initials', 
                     'initial segments',
                     'mean segmental neural length',
                     'initial with branch',
@@ -59,13 +59,13 @@ def set_feature_to_show(neuron):
                     'asymmetric ratio',
                     'mean neuronal/euclidean'] ):
             list_features[name]=\
-            features_attr(feature=neuron.features[name],
+            features_attr(feature=neuron.features[name], 
                           title=name,
                           feature_type='scalar')
         elif(name in ['pictural image xy',
                     'pictural image xy tips']):
             list_features[name]=\
-                features_attr(feature=neuron.features[name],
+                features_attr(feature=neuron.features[name], 
                               title=name,
                               feature_type='density',
                               dim=2)
@@ -74,7 +74,7 @@ def set_feature_to_show(neuron):
                       'continue depth',
                       'main branch depth',
                    'continue depth'
-                   'dead depth'
+                   'dead depth'               
                    'main branch depth',
                    'main dead depth',
                    'branch die depth',
@@ -96,7 +96,7 @@ def set_feature_to_show(neuron):
                        'segmental branch angle',
                        'side branch angle']):
             list_features[name]=\
-                features_attr(feature=neuron.features[name],
+                features_attr(feature=neuron.features[name], 
                               title=name,
                               feature_type='histogram',
                               hist_range=np.arange(0,np.pi,np.pi/20),
@@ -104,26 +104,26 @@ def set_feature_to_show(neuron):
                           y_title='density')
         elif(name == 'distance from parent'):
             list_features[name]=\
-                features_attr(feature=neuron.features[name],
+                features_attr(feature=neuron.features[name], 
                               title=name,
                               feature_type='histogram',
                               hist_range=np.arange(0,20,1),
                               x_title='angle',
-                              y_title='density')
-
+                              y_title='density') 
+                
         elif(name == 'distance from root'):
             list_features[name]=\
-                features_attr(feature=neuron.features[name],
+                features_attr(feature=neuron.features[name], 
                               title=name,
                               feature_type='histogram',
                               hist_range=np.arange(0,500,25),
                               x_title='angle',
-                              y_title='density')
+                              y_title='density') 
         elif(name in ['segmental neural length',
                    'segmental euclidean length',
                    'curvature']):
             list_features[name]=\
-                features_attr(feature=neuron.features[name],
+                features_attr(feature=neuron.features[name], 
                               title=name,
                               feature_type='histogram',
                               hist_range=np.arange(1,30,1),
@@ -133,7 +133,7 @@ def set_feature_to_show(neuron):
                       'neuronal/euclidean',
                    ]):
             list_features[name]=\
-                features_attr(feature=neuron.features[name],
+                features_attr(feature=neuron.features[name], 
                               title=name,
                               feature_type='histogram',
                               hist_range=np.arange(1,3,.05),
@@ -141,34 +141,34 @@ def set_feature_to_show(neuron):
                           y_title='density')
         elif (name in ['discrepancy space']):
             list_features[name]=\
-                features_attr(feature=neuron.features[name],
+                features_attr(feature=neuron.features[name], 
                               title=name,
                           feature_type='density',
                           x_range=np.arange(len(neuron.features[name])),
                           x_title='mesh',
                           y_title='density')
-
+                
         elif (name in ['self avoidance']):
             list_features[name]=\
-                features_attr(feature=neuron.features[name],
+                features_attr(feature=neuron.features[name], 
                               title=name,
                           feature_type='density',
                           x_range=np.arange(len(neuron.features[name])),
                           x_title='mesh',
                           y_title='density')
-
+                
         else:
             print('\n'+'the feature '+name+' is not showing.')
     return list_features
-
+    
 def show_features(neuron,
                   fig_x_size=10,
                   fig_y_size=30,
                   x_grid=10,
                   y_grid=4):
 
-    fig = plt.figure(figsize=(fig_x_size, fig_y_size))
-    gs = gridspec.GridSpec(x_grid, y_grid)
+    fig = plt.figure(figsize=(fig_x_size, fig_y_size)) 
+    gs = gridspec.GridSpec(x_grid, y_grid) 
     index = 1
     McNeuron.visualize.plot_2D(neuron, pass_ax=True,ax=plt.subplot(gs[0]))
     list_features = set_feature_to_show(neuron)
@@ -181,7 +181,7 @@ def show_features(neuron,
     plt.tight_layout()
     plt.show()
 
-
+    
 
 ##########################
 #### CUT FROM NEURON #####

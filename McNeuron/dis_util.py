@@ -1,6 +1,6 @@
 """Distance utility"""
 import numpy as np
-
+#np.random.seed(100)
 
 def get_feature_neuron(neuron,
                        hist_features,
@@ -142,8 +142,8 @@ def distance(neuron,
     vec_value_error = np.zeros(n_vec_value)
     vec_value_error_normal = np.zeros(n_vec_value)
 
-    for k in range(n_hist_features):
-        name = list_hist_features[k]
+    k = 0
+    for name in list_hist_features:
         error, error_normal = l2_distance(neuron=neuron,
                                           name=name,
                                           range_histogram=hist_range[name],
@@ -151,6 +151,7 @@ def distance(neuron,
                                           std=std_hist[name])
         hist_error[k] = error
         hist_error_normal[k] = error_normal
+        k += 1
 
         if(verbose >= 1):
             print(name + ' : %s' % error)
@@ -229,6 +230,8 @@ def l2_distance(neuron,
     hist_fea = np.histogram(feature, bins=range_histogram)[0].astype(float)
     if(sum(hist_fea) != 0):
         hist_fea = hist_fea/sum(hist_fea)
+    else:
+        hist_fea = np.ones(len(hist_fea))/float(len(hist_fea))
     diff_fea = hist_fea - mean
     error = np.sqrt(((diff_fea ** 2)/std**2).mean())
     error_normal = (diff_fea/std).mean()

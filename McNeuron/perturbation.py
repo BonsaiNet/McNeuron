@@ -8,7 +8,7 @@ def add_soma_if_needed(swc_matrix):
         swc_matrix = np.array([[1,1,0,0,0,1,-1],[2,1,0,0,1,1,1]])
     elif (swc_matrix[0,0] != 1):
         swc_matrix = np.append(np.array([[1,1,0,0,0,1,-1]]), swc_matrix, axis=0)
-    return swc_matrix
+    return swc_matrix 
 
 def repair_triple(swc_matrix):
     """
@@ -31,7 +31,7 @@ def repair_triple(swc_matrix):
 
 def correct_swc(swc_matrix):
     """
-    Correct swc if it is fixable. The issues that can be fixed are:
+    Correct swc if it is fixable. The issues that can be fixed are: 
         - adding a node with index 1 as the root if it does not exist
         - if the tree structure is not binary makes it binary.
     """
@@ -79,7 +79,7 @@ def get_standard_order(parents):
     return parents_reordered, permutation_matrix.T
 
 def correct_swc(swc_matrix):
-
+    
     if swc_matrix.shape[0] <2:
         return np.array([[1,1,0,0,0,1,-1],[2,1,0,0,1,1,1]])
     else:
@@ -87,7 +87,7 @@ def correct_swc(swc_matrix):
         new_swc[0,1] = 1
         new_swc[new_swc[:,6]==-1,6] = 1
     return new_swc
-
+        
 def make_standard_swc(matrix):
     parents_reordered, permutation_matrix = get_standard_order(matrix[:, 6])
     new_matrix = np.zeros_like(matrix)
@@ -135,11 +135,11 @@ def star_neuron(wing_number=3,
         for n in range(node_on_each_wings):
             swc_matrix[index, 2] =  length * (n+1) * (orientation[0] * np.cos(wg*angle) - orientation[1] * np.sin(wg*angle))
             swc_matrix[index, 3] =  length * (n+1) * (orientation[0] * np.sin(wg*angle) + orientation[1] * np.cos(wg*angle))
-            swc_matrix[index, 4] = 0
+            swc_matrix[index, 4] = 0 
             if n == 0:
                 swc_matrix[index, 6] = 1
             else:
-                swc_matrix[index, 6] = index
+                swc_matrix[index, 6] = index 
             index += 1
     return swc_matrix
 
@@ -416,11 +416,11 @@ def dendogram_depth(parent_index):
 def map_to_zero_one(vector):
     """
     Mapping linearly the values in a 2 dimesion vector to [0,1] interval.
-
+    
     Parameters:
     -----------
     vector: 2d numpy
-
+        
     Return:
     -------
     scaled_vector: numpy

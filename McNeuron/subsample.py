@@ -11,7 +11,7 @@ def subsample_swc(swc_matrix,
     """
     it first decomposes the tree structure of the neuron by
     breaking it to its segments and the topological tree structures.
-    (Having both these components, we can assemble the tree again.)
+    (Having both these components, we can assemble the tree again.) 
     Then, by going into each segments, the subsampling methodsis applied.
 
 
@@ -25,12 +25,12 @@ def subsample_swc(swc_matrix,
         'nothing': doesn't change anything
         'regular': just preserves the end points and the branching points
         'straigthen': straigthens the neuron based on the length. it approximate
-        the segments such that the distance between two consequative nodes is around
+        the segments such that the distance between two consequative nodes is around 
         'length'. For more info check the function 'straigthen_segment'.
     length: float
         the value to subsample the segment
 
-    Returns:
+    Returns:    
     --------
     swc_matrix: a numpy array of shape [n, 7]
         the subsampled neuron
@@ -62,12 +62,12 @@ def subsample_with_segment_list(list_all_segment, tree, subsample_type, length):
         'nothing': doesn't change anything
         'regular': just preserves the end points and the branching points
         'straigthen': straigthens the neuron based on the length. it approximate
-        the segments such that the distance between two consequative nodes is around
+        the segments such that the distance between two consequative nodes is around 
         'length'. For more info check the function 'straigthen_segment'.
     length: float
         the value to subsample the segment
 
-    Returns:
+    Returns:    
     --------
     swc_matrix: a numpy array of shape [n, 7]
         the subsampled neuron
@@ -87,11 +87,11 @@ def subsample_with_segment_list(list_all_segment, tree, subsample_type, length):
         segment[1:, 6] = range(n_till_now+1, n_till_now + n_will_be)
         swc_matrix = np.append(swc_matrix, segment, axis=0)
         last_index_segment = np.append(last_index_segment, n_till_now + n_will_be)
-    return swc_matrix
+    return swc_matrix 
 
 def list_of_segments(swc_matrix):
     """
-    It decompose the tree to its segments and return the list of all segments
+    It decompose the tree to its segments and return the list of all segments 
     and their tree structure.
 
     Parameters:
@@ -99,7 +99,7 @@ def list_of_segments(swc_matrix):
     swc_matrix: a numpy array of shape [n, 7]
         swc rep of neuron.
 
-    Returns:
+    Returns:    
     --------
     list_all_segment: list of numpy arraies of shape [n, 7]
         each element of the list is a swx matix of the indexed segment. Then segments
@@ -110,7 +110,7 @@ def list_of_segments(swc_matrix):
     """
     swc_matrix = deepcopy(swc_matrix)
     parent_index = tree_util.get_parent_index(swc_matrix)
-    main_index = tree_util.get_index_of_critical_points(swc_matrix,
+    main_index = tree_util.get_index_of_critical_points(swc_matrix, 
                                                    input_type='swc_matrix',
                                                    only_one_somatic_node=False)
     list_all_segment = []
@@ -120,7 +120,7 @@ def list_of_segments(swc_matrix):
         segment = np.array([node])
         segment_name = np.append(segment_name, node)
         current_node = parent_index[node]
-        while current_node not in main_index:
+        while current_node not in main_index: 
             segment = np.append(current_node, segment)
             current_node = parent_index[current_node]
         segment = np.append(current_node, segment)
@@ -128,7 +128,7 @@ def list_of_segments(swc_matrix):
         parent_segment = current_node
         segment_swc = swc_matrix[segment,:]
         segment_swc[:,6] = range(segment_swc.shape[0])
-        list_all_segment.append(segment_swc)
+        list_all_segment.append(segment_swc) 
     le = preprocessing.LabelEncoder()
     le.fit(segment_name)
     tree = le.transform(segment_parent_name)
@@ -138,7 +138,7 @@ def assemble_segments(list_all_segment, tree):
     """
     It attached the segments by tree structure
 
-    Parameters:
+    Parameters:   
     -----------
     list_all_segment: list of numpy arraies of shape [n, 7]
         each element of the list is a swx matix of the indexed segment. Then segments
@@ -147,7 +147,7 @@ def assemble_segments(list_all_segment, tree):
     tree: numpy array of integers
         the parent id of the binary graph that shows the neuron
 
-    Returns:
+    Returns:    
     --------
     swc_matrix: a numpy array of shape [n, 7]
         swc rep of neuron.
@@ -170,16 +170,16 @@ def straigthen_segment(segment, length):
     Parameters:
     -----------
     segment: a numpy array of shape [n, 7]
-        n is representing the number of node that describe the segments and
+        n is representing the number of node that describe the segments and 
         should be at least 7.
 
     length: float
         the value to subsample the segment
 
-    Returns:
+    Returns:    
     --------
     swc_matrix: the subsampled segments
-        it approximates the segment by the length
+        it approximates the segment by the length 
 
     """
     swc_matrix = segment
@@ -195,11 +195,11 @@ def straigthen_segment(segment, length):
 
     upper_index = np.searchsorted(distance_from_root, propose_dis)
     #upper_index[-1] -=1
-    lower_index =  upper_index - 1
+    lower_index =  upper_index - 1    
     lower_index[0] = 0
     upper_index[0] = 1
 
-    weigth_lower = propose_dis - distance_from_root[lower_index]
+    weigth_lower = propose_dis - distance_from_root[lower_index] 
     weigth_upper = distance_from_root[upper_index] - propose_dis
     total_weigth = weigth_lower + weigth_upper
     overlap_points = total_weigth==0
@@ -226,14 +226,14 @@ def subsample_segment(swc_matrix,
         return straigthen_segment(swc_matrix, length)
 
 class Subsample(object):
-
+    
     def set_swc(self, swc_matrix):
         self.swc_matrix = swc_matrix
 
     def fit(self):
         """ set the setments and tree"""
         self.list_all_segment, self.tree = list_of_segments(self.swc_matrix)
-
+    
     def subsample(self, subsample_type='nothing', length = 1):
         """
         Parameters:
@@ -243,18 +243,18 @@ class Subsample(object):
             'nothing': doesn't change anything
             'regular': just preserves the end points and the branching points
             'straigthen': straigthens the neuron based on the length. it approximate
-            the segments such that the distance between two consequative nodes is around
-            'length'. For more info check the function 'straigthen_segment'.
+            the segments such that the distance between two consequative nodes is around 
+            'length'. For more info check the function 'straigthen_segment'.            
 
         length: float
             the value to subsample the segment
 
-        Returns:
+        Returns:    
         --------
         swc_matrix: the subsampled segments
-            it approximates the segment by the length
+            it approximates the segment by the length 
 
-        """
+        """  
         return subsample_with_segment_list(list_all_segment=self.list_all_segment,
                                            tree=self.tree,
                                            subsample_type=subsample_type,

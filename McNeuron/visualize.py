@@ -249,7 +249,7 @@ def plot_2D(neuron,
             projection=np.eye(3),
             ax=''):
     """
-    Plotting a neuron.
+    Plotting a neuron. 
     """
     if isinstance(neuron, np.ndarray):
         location = neuron[:,2:5].T
@@ -271,7 +271,7 @@ def plot_2D(neuron,
     if scale_on:
         p[0, :] = scale[0] * (p[0, :]-min(p[0, :]))/(max(p[0, :]) - min(p[0, :]))
         p[1, :] = scale[1] * (p[1, :]-min(p[1, :]))/(max(p[1, :]) - min(p[1, :]))
-
+    
 
     m = min(depth)
     M = max(depth)
@@ -338,7 +338,7 @@ def plot_2D(neuron,
             ax.axis('off')
             ax.set_xlim((min(p[0,:])-.001,max(p[0,:])+.001))
             ax.set_ylim((min(p[1,:])-.001,max(p[1,:])+.001))
-
+            
     if(len(save)!=0):
         plt.savefig(save, format = "eps")
     if pass_ax is False:
@@ -447,7 +447,7 @@ def plot_dendrogram(neuron,
         ax.add_collection(lc)
         ax.axis('off')
         ax.set_xlim((0, 1))
-        ax.set_ylim((min_y, 0))
+        ax.set_ylim((min_y, 0))        
 
     if(len(save) != 0):
         plt.savefig(save, format="eps")
@@ -590,7 +590,7 @@ def topological_depth(swc_matirx):
     distance_from_parent = neuron.distance_from_parent()
     main, parent_main_point, neural, euclidean = \
         neuron.get_neural_and_euclid_lenght_main_point(branch_order, distance_from_parent)
-
+        
     reg_neuron = Neuron(subsample.regular_subsample(swc_matirx))
     topo_depth = np.zeros(swc_matirx.shape[0])
     depth_main = neuron_util.dendogram_depth(reg_neuron.parent_index)
@@ -605,8 +605,8 @@ def topological_depth(swc_matirx):
                 b = False
             par = neuron.parent_index[par]
     return topo_depth
-
-
+            
+    
 def main_segments(swc_matirx):
     neuron = Neuron(swc_matirx)
     branch_order = tree_util.branch_order(neuron.parent_index)
@@ -614,10 +614,10 @@ def main_segments(swc_matirx):
     main, parent_main_point, neural, euclidean = \
         neuron.get_neural_and_euclid_lenght_main_point(branch_order, distance_from_parent)
     branch_branch, branch_die, die_die, initial_with_branch = \
-        neuron.branching_type(main, parent_main_point)
+        neuron.branching_type(main, parent_main_point) 
     ind_main = nodes_laying_toward_soma(neuron.parent_index,
                                              np.array(np.append(branch_die, die_die)))
-
+    
     main_seg = np.zeros(len(neuron.parent_index))
     main_seg[ind_main] = 1
     return main_seg.astype(int)
@@ -656,7 +656,7 @@ def plot_with_color(swc_matirx,
         ax.add_collection(lc)
         fig.set_size_inches([8, 8])
     else:
-        ax.add_collection(lc)
+        ax.add_collection(lc)     
     ax.axis('off')
     m = min(min(p[:,0]),min(p[:,1]))-.001
     ma = max(max(p[:,0]),max(p[:,1])) +.001
@@ -675,7 +675,7 @@ def topological_depth(swc_matirx):
     distance_from_parent = neuron.distance_from_parent()
     main, parent_main_point, neural, euclidean = \
         neuron.get_neural_and_euclid_lenght_main_point(branch_order, distance_from_parent)
-
+        
     reg_neuron = Neuron(subsample.regular_subsample(swc_matirx))
     topo_depth = np.zeros(swc_matirx.shape[0])
     depth_main = neuron_util.dendogram_depth(reg_neuron.parent_index)
@@ -690,7 +690,7 @@ def topological_depth(swc_matirx):
                 b = False
             par = neuron.parent_index[par]
     return topo_depth
-
+   
 def get_dendrogram_as_tree(swc_matrix):
     swc = swc_matrix
     swc_parent = swc_matrix[:, 6].astype(int)
