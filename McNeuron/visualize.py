@@ -1,43 +1,28 @@
 """Basic visualization of neurite morphologies using matplotlib."""
-
-import sys,time
-import os, sys
-from matplotlib.cm import get_cmap
-from Crypto.Protocol.AllOrNothing import isInt
-sys.setrecursionlimit(10000)
 import numpy as np
-import math
+import sys
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.cm as cm
 import matplotlib.animation as animation
 import pylab as pl
-from matplotlib import collections  as mc
 from PIL import Image
 from numpy.linalg import inv
-
 from McNeuron import Neuron
-from McNeuron import Node
+from McNeuron import subsample
 import neuron_util
-
-import matplotlib as mpl
-from mpl_toolkits.mplot3d import Axes3D
-import matplotlib.gridspec as gridspec
-
-from numpy import mean,cov,double,cumsum,dot,linalg,array,rank
-from pylab import plot,subplot,axis,stem,show,figure, Normalize
-import numpy as np
-import matplotlib.pyplot as plt
-from copy import deepcopy
-import pylab as pl
+import tree_util
 import matplotlib
-from matplotlib import collections  as mc
-from matplotlib.patches import Circle, Wedge, Polygon
+from matplotlib import collections as mc
+from matplotlib.patches import Circle
 from matplotlib.collections import PatchCollection
+import itertools
+from copy import deepcopy
+sys.setrecursionlimit(10000)
 
 def get_2d_image(path, size, dpi, background, show_width):
 
-    neu = McNeuron.Neuron(file_format = 'swc without attributes', input_file=path)
+    neu = Neuron(file_format = 'swc without attributes', input_file=path)
     depth = neu.location[2,:]
     p = neu.location[0:2,:]
     widths= 5*neu.diameter
@@ -259,15 +244,35 @@ def plot_2D(neuron,
             translation=(0, 0),
             scale_on=False,
             scale=(1, 1),
-            save=[]):
+            save=[],
+            pass_ax=False,
+            projection=np.eye(3),
+            ax=''):
+    """
+    Plotting a neuron.
+    """
+    if isinstance(neuron, np.ndarray):
+        location = neuron[:,2:5].T
+        widths= neuron[:,5]
+        parent_index = neuron[:,6] -1
+        parent_index[0] = 0
+        n_node = neuron.shape[0]
+        n_soma = len(np.where(neuron[:,1]==1)[0])
+    else:
+        location = neuron.location
+        widths= neuron.diameter
+        parent_index = neuron.parent_index
+        n_node = neuron.n_node
+        n_soma = neuron.n_soma
 
-    depth = neuron.location[2, :]
-    p = neuron.location[0:2, :]
+    depth = location[2, :]
+    p = deepcopy(location)
+    p = np.dot(projection, p)
     if scale_on:
         p[0, :] = scale[0] * (p[0, :]-min(p[0, :]))/(max(p[0, :]) - min(p[0, :]))
         p[1, :] = scale[1] * (p[1, :]-min(p[1, :]))/(max(p[1, :]) - min(p[1, :]))
-    widths= neuron.diameter
-    #widths[0:3] = 0
+
+
     m = min(depth)
     M = max(depth)
     depth = background * ((depth - m)/(M-m))
@@ -275,19 +280,19 @@ def plot_2D(neuron,
     lines = []
     patches = []
 
-    for i in range(neuron.n_soma):
-        x1 = neuron.location[0, i] + translation[0]
-        y1 = neuron.location[1, i] + translation[1]
+    for i in range(n_soma):
+        x1 = location[0, i] + translation[0]
+        y1 = location[1, i] + translation[1]
         r = widths[i]
         circle = Circle((x1, y1), r, color=str(depth[i]), ec='none', fc='none')
         patches.append(circle)
 
     pa = PatchCollection(patches, cmap=matplotlib.cm.gray)
-    pa.set_array(depth[0]*np.zeros(neuron.n_soma))
+    pa.set_array(depth[0]*np.zeros(n_soma))
 
-    for i in range(len(neuron.nodes_list)):
+    for i in range(n_node):
         colors.append(str(depth[i]))
-        j = neuron.parent_index[i]
+        j = int(parent_index[i])
         lines.append([(p[0,i] + translation[0],p[1,i] + translation[1]),(p[0,j] + translation[0],p[1,j] + translation[1])])
 
     if(show_width):
@@ -299,39 +304,45 @@ def plot_2D(neuron,
         if(show_depth):
             lc = mc.LineCollection(lines, colors=colors, linewidths = line_width)
         else:
-            lc = mc.LineCollection(lines, linewidths = line_width, color = 'k')
+            lc = mc.LineCollection(lines, linewidths=line_width, color = 'k')
 
-    if(give_image):
-        if(red_after):
-            line1 = []
-            line2 = []
-            (I1,) = np.where(~np.isnan(neuron.connection[:,node_red]))
-            (I2,) = np.where(np.isnan(neuron.connection[:,node_red]))
-            for i in I1:
-                j = neuron.parent_index[i]
-                line1.append([(p[0,i],p[1,i]),(p[0,j],p[1,j])])
-                lc1 = mc.LineCollection(line1, linewidths = 2*line_width, color = 'r')
-            for i in I2:
-                j = neuron.parent_index[i]
-                line2.append([(p[0,i],p[1,i]),(p[0,j],p[1,j])])
-                lc2 = mc.LineCollection(line2, linewidths = line_width, color = 'k')
-            return (lc1, lc2, (min(p[0,:]),max(p[0,:])), (min(p[1,:]),max(p[1,:])))
-        else:
-            return (lc, (min(p[0,:]),max(p[0,:])), (min(p[1,:]),max(p[1,:])))
+    if(red_after):
+        colors = np.zeros(len(lines))
+        I = neuron.connecting_after_node(node_red)
+        colors[I] = 1
+        #lc = mc.LineCollection(lines, color=colors)
+        # for i in I1:
+        #     j = neuron.parent_index[i]
+        #     line1.append([(p[0,i],p[1,i]),(p[0,j],p[1,j])])
+        #     lc1 = mc.LineCollection(line1, linewidths = 2*line_width, color = 'r')
+        # for i in I2:
+        #     j = neuron.parent_index[i]
+        #     line2.append([(p[0,i],p[1,i]),(p[0,j],p[1,j])])
+        #     lc2 = mc.LineCollection(line2, linewidths = line_width, color = 'k')
+            #return (lc1, lc2, (min(p[0,:]),max(p[0,:])), (min(p[1,:]),max(p[1,:])))
+        #else:
+            #return (lc, (min(p[0,:]),max(p[0,:])), (min(p[1,:]),max(p[1,:])))
     else:
-        fig, ax = plt.subplots()
-        ax.add_collection(lc)
-        if(show_soma):
-            ax.add_collection(pa)
-        fig.set_size_inches([size_x + 1, size_y + 1])
-        fig.set_dpi(dpi)
-        plt.axis('off')
-        plt.xlim((min(p[0,:]),max(p[0,:])))
-        plt.ylim((min(p[1,:]),max(p[1,:])))
-        #plt.draw()
+        if pass_ax is False:
+            fig, ax = plt.subplots()
+            ax.add_collection(lc)
+            if(show_soma):
+                ax.add_collection(pa)
+            fig.set_size_inches([size_x + 1, size_y + 1])
+            fig.set_dpi(dpi)
+            plt.axis('off')
+            plt.xlim((min(p[0,:])-.001,max(p[0,:])+.001))
+            plt.ylim((min(p[1,:])-.001,max(p[1,:])+.001))
+        else:
+            ax.add_collection(lc)
+            ax.axis('off')
+            ax.set_xlim((min(p[0,:])-.001,max(p[0,:])+.001))
+            ax.set_ylim((min(p[1,:])-.001,max(p[1,:])+.001))
+
+    if(len(save)!=0):
+        plt.savefig(save, format = "eps")
+    if pass_ax is False:
         plt.show()
-        if(len(save)!=0):
-            plt.savefig(save, format = "eps")
 
 def plot_evolution_mcmc(mcmc):
     """
@@ -342,317 +353,6 @@ def plot_evolution_mcmc(mcmc):
         print('step %s' % k)
         k += 1
         plot_2D(n)
-
-def plot_3D(neuron, color_scheme="default", color_mapping=None,
-            synapses=None, save_image="animation",show_radius=True):
-    """
-    3D matplotlib plot of a neuronal morphology. The SWC has to be formatted with a "three point soma".
-    Colors can be provided and synapse location marked
-
-    Parameters
-    -----------
-    color_scheme: string
-        "default" or "neuromorpho". "neuronmorpho" is high contrast
-    color_mapping: list[float] or list[list[float,float,float]]
-        Default is None. If present, this is a list[N] of colors
-        where N is the number of compartments, which roughly corresponds to the
-        number of lines in the SWC file. If in format of list[float], this list
-        is normalized and mapped to the jet color map, if in format of
-        list[list[float,float,float,float]], the 4 floats represt R,G,B,A
-        respectively and must be between 0-255. When not None, this argument
-        overrides the color_scheme argument(Note the difference with segments).
-    synapses : vector of bools
-        Default is None. If present, draw a circle or dot in a distinct color
-        at the location of the corresponding compartment. This is a
-        1xN vector.
-    save_image: string
-        Default is None. If present, should be in format "file_name.extension",
-        and figure produced will be saved as this filename.
-    show_radius : boolean
-        True (default) to plot the actual radius. If set to False,
-        the radius will be taken from `btmorph2\config.py`
-    """
-
-    if show_radius==False:
-        plot_radius = config.fake_radius
-
-    if color_scheme == 'default':
-        my_color_list = config.c_scheme_default['neurite']
-    elif color_scheme == 'neuromorpho':
-        my_color_list = config.c_scheme_nm['neurite']
-    else:
-        raise Exception("Not valid color scheme")
-    #print 'my_color_list: ', my_color_list
-
-    fig, ax = plt.subplots()
-
-    if color_mapping is not None:
-        if isinstance(color_mapping[0], int):
-            jet = plt.get_cmap('jet')
-            norm = colors.Normalize(np.min(color_mapping), np.max(color_mapping))
-            scalarMap = cm.ScalarMappable(norm=norm, cmap=jet)
-
-            Z = [[0, 0], [0, 0]]
-            levels = np.linspace(np.min(color_mapping), np.max(color_mapping), 100)
-            CS3 = plt.contourf(Z, levels, cmap=jet)
-            plt.clf()
-
-    ax = fig.gca(projection='3d')
-
-    index = 0
-
-    for node in neuron.nodes_list: # not ordered but that has little importance here
-        # draw a line segment from parent to current point
-        c_x = node.xyz[0]
-        c_y = node.xyz[1]
-        c_z = node.xyz[2]
-        c_r = node.r
-
-        if index < 3:
-            pass
-        else:
-            parent = node.parent
-            p_x = parent.xyz[0]
-            p_y = parent.xyz[1]
-            p_z = parent.xyz[2]
-            # p_r = parent.content['p3d'].radius
-            # print 'index:', index, ', len(cs)=', len(color_mapping)
-            if show_radius==False:
-                line_width = plot_radius
-            else:
-                line_width = c_r/2.0
-
-            if color_mapping is None:
-                ax.plot([p_x, c_x], [p_y, c_y], [p_z, c_z], my_color_list[node.set_type_from_name() - 1], linewidth=line_width)
-            else:
-                if isinstance(color_mapping[0], int):
-                    c = scalarMap.to_rgba(color_mapping[index])
-                elif isinstance(color_mapping[0], list):
-                    c = [float(x) / 255 for x in color_mapping[index]]
-
-                ax.plot([p_x, c_x], [p_y, c_y], [p_z, c_z], c=c, linewidth=c_r/2.0)
-            # add the synapses
-        if synapses is not None:
-            if synapses[index]:
-                ax.scatter(c_x, c_y, c_z, c='r')
-
-        index += 1
-
-    #minv, maxv = neuron.get_boundingbox()
-    #minv = min(minv)
-    #maxv = max(maxv)
-    #ax.auto_scale_xyz([minv, maxv], [minv, maxv], [minv, maxv])
-
-    index = 0
-
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-
-    if color_mapping is not None:
-        if isinstance(color_mapping[0], int):
-            cb = plt.colorbar(CS3) # bit of a workaround, but it seems to work
-            ticks_f = np.linspace(np.min(color_mapping)-1, np.max(color_mapping)+1, 5)
-            ticks_i = map(int, ticks_f)
-            cb.set_ticks(ticks_i)
-
-    # set the bg color
-    fig = plt.gcf()
-    ax = fig.gca()
-    if color_scheme == 'default':
-        ax.set_axis_bgcolor(config.c_scheme_default['bg'])
-    elif color_scheme == 'neuromorpho':
-        ax.set_axis_bgcolor(config.c_scheme_nm['bg'])
-
-    if save_image is not None:
-        plt.savefig(save_image)
-
-    plt.show()
-
-    return fig
-
-def animate(neuron, color_scheme="default", color_mapping=None,
-            synapses=None, save_image=None, axis="z"):
-    """
-    3D matplotlib plot of a neuronal morphology. The SWC has to be formatted with a "three point soma".
-    Colors can be provided and synapse location marked
-
-    Parameters
-    -----------
-    color_scheme: string
-        "default" or "neuromorpho". "neuronmorpho" is high contrast
-    color_mapping: list[float] or list[list[float,float,float]]
-        Default is None. If present, this is a list[N] of colors
-        where N is the number of compartments, which roughly corresponds to the
-        number of lines in the SWC file. If in format of list[float], this list
-        is normalized and mapped to the jet color map, if in format of
-        list[list[float,float,float,float]], the 4 floats represt R,G,B,A
-        respectively and must be between 0-255. When not None, this argument
-        overrides the color_scheme argument(Note the difference with segments).
-    synapses : vector of bools
-        Default is None. If present, draw a circle or dot in a distinct color
-        at the location of the corresponding compartment. This is a
-        1xN vector.
-    save_image: string
-        Default is None. If present, should be in format "file_name.extension",
-        and figure produced will be saved as this filename.
-
-    """
-
-    if color_scheme == 'default':
-        my_color_list = config.c_scheme_default['neurite']
-    elif color_scheme == 'neuromorpho':
-        my_color_list = config.c_scheme_nm['neurite']
-    else:
-        raise Exception("Not valid color scheme")
-    print 'my_color_list: ', my_color_list
-
-    fig, ax = plt.subplots()
-
-    if color_mapping is not None:
-        if isinstance(color_mapping[0], int):
-            jet = plt.get_cmap('jet')
-            norm = colors.Normalize(np.min(color_mapping), np.max(color_mapping))
-            scalarMap = cm.ScalarMappable(norm=norm, cmap=jet)
-
-            Z = [[0, 0], [0, 0]]
-            levels = np.linspace(np.min(color_mapping), np.max(color_mapping), 100)
-            CS3 = plt.contourf(Z, levels, cmap=jet)
-            plt.clf()
-
-    ax = fig.gca(projection='3d')
-
-    index = 0
-
-    for node in neuron.nodes_list: # not ordered but that has little importance here
-        # draw a line segment from parent to current point
-        c_x = node.xyz[0]
-        c_y = node.xyz[1]
-        c_z = node.xyz[2]
-        c_r = node.r
-
-        if index < 3:
-            pass
-        else:
-            parent = node.parent
-            p_x = parent.xyz[0]
-            p_y = parent.xyz[1]
-            p_z = parent.xyz[2]
-            # p_r = parent.content['p3d'].radius
-            # print 'index:', index, ', len(cs)=', len(color_mapping)
-            if color_mapping is None:
-                ax.plot([p_x, c_x], [p_y, c_y], [p_z, c_z], my_color_list[node.set_type_from_name() - 1], linewidth=c_r/2.0)
-            else:
-                if isinstance(color_mapping[0], int):
-                    c = scalarMap.to_rgba(color_mapping[index])
-                elif isinstance(color_mapping[0], list):
-                    c = [float(x) / 255 for x in color_mapping[index]]
-
-                ax.plot([p_x, c_x], [p_y, c_y], [p_z, c_z], c=c, linewidth=c_r/2.0)
-            # add the synapses
-        if synapses is not None:
-            if synapses[index]:
-                ax.scatter(c_x, c_y, c_z, c='r')
-
-        index += 1
-
-    #minv, maxv = neuron.get_boundingbox()
-    #minv = min(minv)
-    #maxv = max(maxv)
-    #ax.auto_scale_xyz([minv, maxv], [minv, maxv], [minv, maxv])
-
-    index = 0
-
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-
-    if color_mapping is not None:
-        if isinstance(color_mapping[0], int):
-            cb = plt.colorbar(CS3) # bit of a workaround, but it seems to work
-            ticks_f = np.linspace(np.min(color_mapping)-1, np.max(color_mapping)+1, 5)
-            ticks_i = map(int, ticks_f)
-            cb.set_ticks(ticks_i)
-
-    # set the bg color
-    fig = plt.gcf()
-    ax = fig.gca()
-    if color_scheme == 'default':
-        ax.set_axis_bgcolor(config.c_scheme_default['bg'])
-    elif color_scheme == 'neuromorpho':
-        ax.set_axis_bgcolor(config.c_scheme_nm['bg'])
-
-    anim = animation.FuncAnimation(fig, _animate_rotation,fargs=(ax,), frames=60)
-    #anim.save(save_image + ".gif", writer='imagemagick', fps=4)
-
-    # anim.save(save_image + ".gif", writer='ffmpeg', fps=4)
-
-
-    return fig
-
-def _animate_rotation(nframe,fargs):
-    fargs.view_init(elev=0, azim=nframe*6)
-
-def plot_3D_Forest(neuron, color_scheme="default", save_image=None):
-    """
-    3D matplotlib plot of a neuronal morphology. The Forest has to be formatted with a "three point soma".
-    Colors can be provided and synapse location marked
-
-    Parameters
-    -----------
-    color_scheme: string
-        "default" or "neuromorpho". "neuronmorpho" is high contrast
-    save_image: string
-        Default is None. If present, should be in format "file_name.extension",
-        and figure produced will be saved as this filename.
-    """
-    my_color_list = ['r','g','b','c','m','y','r--','b--','g--']
-
-    # resolve some potentially conflicting arguments
-    if color_scheme == 'default':
-        my_color_list = config.c_scheme_default['neurite']
-    elif color_scheme == 'neuromorpho':
-        my_color_list = config.c_scheme_nm['neurite']
-    else:
-        raise Exception("Not valid color scheme")
-    print 'my_color_list: ', my_color_list
-
-    fig, ax = plt.subplots()
-
-    ax = fig.gca(projection='3d')
-
-
-    index = 0
-    for node in neuron.nodes_list:
-        c_x = node.xyz[0]
-        c_y = node.xyz[1]
-        c_z = node.xyz[2]
-        c_r = node.r
-
-        if index < 3:
-            pass
-        else:
-            parent = node.parent
-            p_x = parent.xyz[0]
-            p_y = parent.xyz[1]
-            p_z = parent.xyz[2]
-            # p_r = parent.content['p3d'].radius
-            # print 'index:', index, ', len(cs)=', len(color_mapping)
-
-            ax.plot([p_x, c_x], [p_y, c_y], [p_z, c_z], my_color_list[node.set_type_from_name() - 1], linewidth=c_r/2.0)
-        index += 1
-
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-
-    plt.show()
-
-    if save_image is not None:
-        plt.savefig(save_image)
-
-    return fig
-
 
 def decompose_immediate_children(matrix):
     """
@@ -704,14 +404,17 @@ def box(x_min, x_max, y, matrix, line):
 
 def plot_dendrogram(neuron,
                     show_all_nodes=False,
-                    save=[]):
+                    save=[],
+                    pass_ax=False, ax=''):
     """
-    Showing the dendogram of the neuron.
+    Showing the dendogram of the neuron. In the case that neuron is represented
+    by a numpy arry, its the parent index of its swc format.
 
     Parameters
     ----------
-    neuron: Neuron
-        the input neuron
+    neuron: Neuron or numpy
+        in the case that the input is numpy, it should be swc parent index (start from 1 and
+        without 0 in the whole array) and also the initial value should be 0.
     show_all_nodes: boolean
         if Ture, it will show all the nodes, otherwise only the main points are
         taking into account.
@@ -719,9 +422,12 @@ def plot_dendrogram(neuron,
         the path to save the figure.
     """
     # for swc format: neuron[:,-1]
-    a = neuron.parent_index + 1
-    a[0] = 0
-    a = a.astype(int)
+    if isinstance(neuron, np.ndarray):
+        a = neuron
+    else:
+        a = neuron.parent_index + 1
+        a[0] = 0
+        a = a.astype(int)
 
     A = np.zeros([a.shape[0]+1, a.shape[0]+1])
     A[np.arange(1, a.shape[0]+1), a] = 1
@@ -731,14 +437,22 @@ def plot_dendrogram(neuron,
     for i in l:
         min_y = min(min_y, i[1][1])
     lc = mc.LineCollection(l)
-    fig, ax = plt.subplots()
-    ax.add_collection(lc)
-    plt.axis('off')
-    plt.xlim((0, 1))
-    plt.ylim((min_y, 0))
-    plt.draw()
+    if pass_ax is False:
+        fig, ax = plt.subplots()
+        ax.add_collection(lc)
+        plt.axis('off')
+        plt.xlim((0, 1))
+        plt.ylim((min_y, 0))
+    else:
+        ax.add_collection(lc)
+        ax.axis('off')
+        ax.set_xlim((0, 1))
+        ax.set_ylim((min_y, 0))
+
     if(len(save) != 0):
         plt.savefig(save, format="eps")
+    if pass_ax is False:
+        plt.draw()
 
 def show_database(collection):
     for n in collection.database:
@@ -754,10 +468,10 @@ def show_database(collection):
         v = collection.std_hist[name]/10.
         plt.fill_between(x=collection.hist_features[name][1:], y1=m+v, y2=m-v)
         plt.show()
-    plt.imshow(collection.mean_vec_value['pictural_image_xy'].reshape(10, 10))
+    plt.imshow(collection.mean_vec_value['pictural image xy'].reshape(10, 10))
     plt.colorbar()
     plt.show()
-    plt.imshow(collection.mean_vec_value['pictural_image_xy_tips'].reshape(10, 10))
+    plt.imshow(collection.mean_vec_value['pictural image xy tips'].reshape(10, 10))
     plt.colorbar()
     plt.show()
     for name in collection.vec_value:
@@ -766,3 +480,232 @@ def show_database(collection):
         v = collection.std_vec_value[name]/10.
         plt.fill_between(x=range(0, len(m)), y1=m+v, y2=m-v)
         plt.show()
+
+
+def plot_confusion_matrix(cm, classes,
+                          normalize=False,
+                          title='Confusion matrix',
+                          cmap=plt.cm.Purples):
+    """
+    This function prints and plots the confusion matrix.
+    Normalization can be applied by setting `normalize=True`.
+    """
+    if normalize:
+        cm = cm.astype('float').T / cm.sum(axis=1).astype('float')
+        cm = cm.T
+        cm = np.floor(cm*100.).astype(int)
+        print cm
+
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title)
+    #plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=90)
+    plt.yticks(tick_marks, classes)
+
+
+
+
+    thresh = cm.max() / 2.
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, cm[i, j],
+                 horizontalalignment="center",
+                 color="white" if cm[i, j] > thresh else "black")
+
+    #plt.tight_layout()
+    plt.ylabel('True label')
+    #plt.xlabel('Predicted label')
+
+def get_segment_collection_neuron(collection,
+                                  row=None,
+                                  column=None,
+                                  scale=None):
+    lines = []
+    index = 0
+    if row is None:
+        row = np.floor(np.sqrt(len(collection)))
+    if column is None:
+        column = np.floor(float(len(collection))/row) + 1
+    if scale is None:
+        scale = 2.5 * column * 500
+    for r in np.arange(row):
+        for col in np.arange(column):
+            if(index < len(collection)):
+                neuron = collection[index]
+                index += 1
+                p = neuron.location[0:2, :]
+                p = p/scale
+                for i in range(neuron.n_node):
+                    j = neuron.parent_index[i]
+                    lines.append([(p[0, i] + col/column, p[1, i] + 1 - r/row),
+                                  (p[0, j] + col/column, p[1, j] + 1 - r/row)])
+    lc = mc.LineCollection(lines, color='k')
+    return lc
+
+def get_segment_collection(neuron):
+    lines = []
+    p = neuron.location[0:2, :]
+    p = p/(.2*p.max())
+    for i in range(p.shape[1]):
+        j = neuron.parent_index[i]
+        if(j>=0):
+            lines.append([(p[0,i] ,p[1,i]),
+                        (p[0,j],p[1,j] )])
+    lc = mc.LineCollection(lines, color = 'k')
+    return lc
+
+def evolution_with_increasing_node(neuron):
+    for i in range(10):
+        m = neuron_util.get_swc_matrix(neuron)
+        m = m[40*i:, :]
+        I = m[:, 6]
+        I = I - 40*i
+        I[I < 0] = -1
+        m[:, 6] = I
+        n = Neuron(input_file=m, input_format='Matrix of swc without Node class')
+        lc = get_segment_collection(n)
+        fig = plt.figure(figsize=(4, 4))
+        fig, ax = plt.subplots()
+        ax.add_collection(lc)
+        plt.axis('off')
+        plt.xlim((-6, 6))
+        plt.ylim((-6, 6))
+        #plt.draw()
+        plt.show()
+
+def nodes_laying_toward_soma(parents, selected_nodes):
+    all_nodes = np.array([])
+    for i in selected_nodes:
+        par = i
+        while par != 0:
+            all_nodes = np.append(all_nodes, par)
+            par = parents[par]
+    all_nodes = np.append(all_nodes, 0)
+    all_nodes = np.unique(all_nodes).astype(int)
+    return all_nodes
+
+def topological_depth(swc_matirx):
+    neuron = Neuron(swc_matirx)
+    branch_order = tree_util.branch_order(neuron.parent_index)
+    distance_from_parent = neuron.distance_from_parent()
+    main, parent_main_point, neural, euclidean = \
+        neuron.get_neural_and_euclid_lenght_main_point(branch_order, distance_from_parent)
+
+    reg_neuron = Neuron(subsample.regular_subsample(swc_matirx))
+    topo_depth = np.zeros(swc_matirx.shape[0])
+    depth_main = neuron_util.dendogram_depth(reg_neuron.parent_index)
+    topo_depth[main] = depth_main
+    for i in range(1, swc_matirx.shape[0]):
+        b = True
+        par = i
+        while b:
+            (index,) = np.where(main==par)
+            if len(index) != 0:
+                topo_depth[i] = topo_depth[main[index]]
+                b = False
+            par = neuron.parent_index[par]
+    return topo_depth
+
+
+def main_segments(swc_matirx):
+    neuron = Neuron(swc_matirx)
+    branch_order = tree_util.branch_order(neuron.parent_index)
+    distance_from_parent = neuron.distance_from_parent()
+    main, parent_main_point, neural, euclidean = \
+        neuron.get_neural_and_euclid_lenght_main_point(branch_order, distance_from_parent)
+    branch_branch, branch_die, die_die, initial_with_branch = \
+        neuron.branching_type(main, parent_main_point)
+    ind_main = nodes_laying_toward_soma(neuron.parent_index,
+                                             np.array(np.append(branch_die, die_die)))
+
+    main_seg = np.zeros(len(neuron.parent_index))
+    main_seg[ind_main] = 1
+    return main_seg.astype(int)
+
+def plot_with_color(swc_matirx,
+                    color_depth=[],
+                    save=[],
+                    pass_ax=False, ax=''):
+    if len(color_depth)==0:
+        color_depth = np.ones(swc_matirx.shape[0])
+    p = swc_matirx[:, 2:5]
+    m = max(max(p[:, 0]) - min(p[:, 0]), max(p[:, 1]) - min(p[:, 1]))
+    p[:, 0] = (p[:, 0]-min(p[:, 0]))/m
+    p[:, 1] = (p[:, 1]-min(p[:, 1]))/m
+    colors = []
+    lines = []
+    patches = []
+
+    pa = PatchCollection(patches, cmap=matplotlib.cm.gray)
+    colors = []
+    colors_binary = main_segments(swc_matirx)
+    linewidths=[]
+    for i in range(1, swc_matirx.shape[0]):
+        j = swc_matirx[i,6] - 1
+        lines.append([(p[i,0],p[i,1]),(p[j,0],p[j,1])])
+        if colors_binary[i] == 0:
+            colors.append((0,0,1))
+            linewidths.append(1)
+        else:
+            colors.append((color_depth[i],0,1-color_depth[i]))
+            linewidths.append(2)
+            #colors.append((1,0,0))
+    lc = mc.LineCollection(colors=colors,segments=lines,linewidths=linewidths)
+    if pass_ax is False:
+        fig, ax = plt.subplots()
+        ax.add_collection(lc)
+        fig.set_size_inches([8, 8])
+    else:
+        ax.add_collection(lc)
+    ax.axis('off')
+    m = min(min(p[:,0]),min(p[:,1]))-.001
+    ma = max(max(p[:,0]),max(p[:,1])) +.001
+    ax.set_xlim((m,ma))
+    ax.set_ylim((m,ma))
+
+    if(len(save)!=0):
+        plt.savefig(save, format = "eps")
+    if pass_ax is False:
+        plt.show()
+
+
+def topological_depth(swc_matirx):
+    neuron = Neuron(swc_matirx)
+    branch_order = tree_util.branch_order(neuron.parent_index)
+    distance_from_parent = neuron.distance_from_parent()
+    main, parent_main_point, neural, euclidean = \
+        neuron.get_neural_and_euclid_lenght_main_point(branch_order, distance_from_parent)
+
+    reg_neuron = Neuron(subsample.regular_subsample(swc_matirx))
+    topo_depth = np.zeros(swc_matirx.shape[0])
+    depth_main = neuron_util.dendogram_depth(reg_neuron.parent_index)
+    topo_depth[main] = depth_main
+    for i in range(1, swc_matirx.shape[0]):
+        b = True
+        par = i
+        while b:
+            (index,) = np.where(main==par)
+            if len(index) != 0:
+                topo_depth[i] = topo_depth[main[index]]
+                b = False
+            par = neuron.parent_index[par]
+    return topo_depth
+
+def get_dendrogram_as_tree(swc_matrix):
+    swc = swc_matrix
+    swc_parent = swc_matrix[:, 6].astype(int)
+    parent_index = swc_parent
+    parent_index[0] = 0
+    A = np.zeros([parent_index.shape[0]+1, parent_index.shape[0]+1])
+    A[np.arange(1, parent_index.shape[0]+1), parent_index] = 1
+    B = inv(np.eye(parent_index.shape[0]+1) - A)
+    l = box(0., 1., 0., B, [])
+    swc = np.zeros([len(l),7])
+    for i in range(len(l)):
+        swc[i, 2] = l[i][1][0]
+        swc[i, 3] = l[i][1][1]
+        if i>0:
+            a = np.where((swc[:, 2] - l[i][0][0])**2 + (swc[:, 3] - l[i][0][1])**2==0)[0]
+            swc[i, 6] = a+1
+    swc[0, 6] = -1
+    return swc

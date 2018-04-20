@@ -3,16 +3,17 @@
 import numpy as np
 from numpy import linalg as LA
 from McNeuron import visualize
-import neuron_util
+import swc_util
 import dis_util
 import matplotlib.pyplot as plt
+from matplotlib import gridspec
 from copy import deepcopy
 from scipy.stats import chi2
 from scipy.stats import vonmises
 from scipy.stats import multivariate_normal
 from numpy.linalg import inv
 import scipy.special
-# np.random.seed(500)
+#np.random.seed(500)
 
 class MCMC(object):
 
@@ -70,7 +71,7 @@ class MCMC(object):
         self.initial_seg = initial_seg
         if neuron is None:
             n_wing = int(self.n_node/self.initial_seg)
-            self.neuron = neuron_util.star_neuron(wing_number=n_wing,
+            self.neuron = swc_util.star_neuron(wing_number=n_wing,
                                                   node_on_each_wings=self.initial_seg)
         else:
             self.neuron = neuron
@@ -110,6 +111,7 @@ class MCMC(object):
             self.p_prob = np.array([.01,.09,.65,.25,.1])
         else:
             self.p_prob = MCMC_prob
+        self.name_feature_set = ''
         self.erf = 0.5*(3+scipy.special.erf(-mean_len_to_parent/np.sqrt(2)))
         self.mean_len_to_parent = mean_len_to_parent
         self.var_len_to_parent = var_len_to_parent
@@ -139,10 +141,11 @@ class MCMC(object):
         self.set_mean_var_length(length_mean, length_var)
         self.chosen_prob_index = 0
         self.acc = 0
+        self.saving = 100
 
     def fit(self):
         """
-        Performing Markov Chain Monte Carlo methods. It starts with current
+        implementation of Markov Chain Monte Carlo methods. It starts with current
         neuron and in each iteration selects one of the pertubations form the
         probability distribution of MCMC_prob and does it on the neuron. based
         on the rejection critera of Metropolis_Hasting method, the proposal
@@ -152,6 +155,7 @@ class MCMC(object):
         Returns
         -------
         """
+        self.neuron.set_features(self.name_feature_set)
         for i in range(self.ite):
             current_neuron = deepcopy(self.neuron)
             p_current, error_vec_current, error_vec_normal_current = \
@@ -160,27 +164,30 @@ class MCMC(object):
             self.chosen_prob_index = np.append(self.chosen_prob_index,
                                                index_per)
             p_sym, details = self.do_MCMC(per)
+            self.neuron.set_features(self.name_feature_set)
             p_proposal, error_vec_proposal, error_vec_normal_proposal = \
                 self.distance(neuron=self.neuron)
             a = min(1, p_sym * np.exp(p_current - p_proposal))
-            B = self.accept_proposal(a)
+            being_accepted = self.accept_proposal(a)
 
             if(self.verbose >= 1):
                 print('Selected perturbation = ' + per)
                 if(self.verbose >= 2):
                     print('\n'+"step:%s. Report for Current Neuron" % (i)+'\n')
-                    neuron_util.check_neuron(current_neuron)
+                    swc_util.check_neuron(current_neuron)
                     if(self.verbose >= 3):
                         print("visualize current neuron:")
-                        visualize.plot_2D(current_neuron, size_x=10, size_y=10)
+                        visualize.plot_2D(current_neuron,
+                                          size_x=5,
+                                          size_y=5)
                 if(self.verbose >= 2):
                     print("Report for Proposal Neuron:")
-                    neuron_util.check_neuron(self.neuron)
+                    swc_util.check_neuron(self.neuron)
                     if(self.verbose >= 3):
                         print("visualize the proposed neuron:")
-                        visualize.plot_2D(self.neuron, size_x=10, size_y=10)
+                        visualize.plot_2D(self.neuron, size_x=5, size_y=5)
 
-            if(B):
+            if(being_accepted):
                 p_current = p_proposal
                 error_vec_current = error_vec_proposal
                 error_vec_normal_current = error_vec_normal_proposal
@@ -193,14 +200,17 @@ class MCMC(object):
                 self.trend = np.append(self.trend, np.expand_dims(error_vec_current, axis=1), axis=1)
                 self.trend_normal = np.append(self.trend_normal, np.expand_dims(error_vec_normal_current, axis=1), axis=1)
                 self.acc = np.append(self.acc, 0)
-            if len(self.neuron.nodes_list) == self.neuron.n_soma:
-                self.neuron = self.initial_neuron(int(self.n_node/self.initial_seg),self.initial_seg)
+            if self.neuron.n_node == self.neuron.n_soma:
+                self.neuron = self.initial_neuron(int(self.n_node/self.initial_seg), self.initial_seg)
                 p_current, error_vec_current, error_vec_normal_current = \
                     self.distance(neuron=self.neuron)
             if self.verbose >= 1:
                 print('the p of acceptance was %s and it was %s that it`s been accepted.' % (a, B))
-            if(np.remainder(i, 100) == 0):
+            if(np.remainder(i, self.saving) == 0):
                 self.evo.append(deepcopy(self.neuron))
+                if(self.verbose > 0):
+                    print("Step = " + str(self.trend.shape[1]))
+                    visualize.plot_2D(self.neuron, size_x=5, size_y=5)
 
     def set_trend(self):
         self.list_features = self.hist_features.keys() + list(self.value_features) + list(self.vec_value)
@@ -240,6 +250,19 @@ class MCMC(object):
                               std_vec_value=self.std_vec_value)
         return total_error, error, error_normal
 
+    def get_all_features(self):
+        """
+        return all the features that are used for algorithm.
+        """
+        all_features = []
+        for name in self.hist_features:
+            all_features.append(name)
+        for name in self.value_features:
+            all_features.append(name)
+        for name in self.vec_value:
+            all_features.append(name)
+        return all_features
+
     def set_ratio_red_to_ext(self,c):
         self.ratio_red_to_ext = c
         self.neuron.set_ratio_red_to_ext(c)
@@ -256,6 +279,11 @@ class MCMC(object):
 
     def set_n_iteration(self, n):
         self.ite = n
+
+    def select_proposal(self):
+        (I,) = np.where(self._consum_prob >= np.random.random_sample(1,))
+        p = min(I)
+        return p, self.p_list[p]
 
     def do_MCMC(self, per):
         if per == 'extension/reduction': # do extension/reduction
@@ -293,6 +321,8 @@ class MCMC(object):
             p_sym, details = self.do_sliding_branch(self.neuron)
         if per == 'sliding for branching node certain distance': # do sliding only for branch
             p_sym, details = self.do_sliding_branch_certain_distance(self.neuron)
+        if per == 'sliding for end nodes': # do sliding only for branch
+            p_sym, details = self.do_sliding_end_node(self.neuron)
 
         if per == 'stretching vertical':
             p_sym, details = self.do_vertical_stretching(self.neuron)
@@ -302,131 +332,42 @@ class MCMC(object):
             p_sym, details = self.do_sinusidal_wave(self.neuron)
         return p_sym, details
 
-    def do_sinusidal_wave(self, neuron):
+    def set_ext_red_list(self, neuron):
         """
-        NOT READY
+        In the extension-reduction perturbation, one of the node will be removed or one node will be added. In the first case, the node can only be
+        an end point, but in the second case the new node might be added to any node that has one or zero child.
+
+        dependency:
+            self.nodes_list
+            self.branch_order
+            self.n_soma
+            self.ratio_red_to_ext
+
+        ext_red_list:
+            first row: end points and order one nodes (for extension)
+            second row: end points (for removing)
+            third row: end point wich thier parents are order one nodes (for extension)
+
+        Remarks:
+            1) The list is zero for the soma nodes.
+            2) The value for first and second is binary but the third row is self.ratio_red_to_ext
         """
-        (branch_index,)  = np.where(neuron.branch_order==2)
-        (end_nodes,)  = np.where(neuron.branch_order==0)
-        nodes = np.append(branch_index,end_nodes)
-        parents = neuron.parent_index_for_node_subset(nodes)
-        n = np.floor(nodes.shape[0]*np.random.rand()).astype(int)
-        node_index = nodes[n]
-        parent_index = parents[n]
-        hight = np.exp(np.random.normal() * self.sinusidal_hight)
-
-        neuron.sinudal(node_index, parent_index, hight, n_vertical, n_horizental)
-        details = [0,0,0]
-        details[0] = node_index
-        details[1] = parent_index
-        details[2] = hight
-        details[3] = n_vertical
-        details[4] = n_horizental
-        p_sym = 1
-        return p_sym, details
-
-    def do_vertical_stretching(self, neuron):
-        """
-        In one of the segments that coming out from a branching points will be stretched.
-        """
-        (branch_index,)  = np.where(neuron.branch_order==2)
-        (end_nodes,)  = np.where(neuron.branch_order==0)
-        nodes = np.append(branch_index,end_nodes)
-        parents = neuron.parent_index_for_node_subset(nodes)
-        n = np.floor(nodes.shape[0]*np.random.rand()).astype(int)
-        p = np.exp(np.random.normal() * self.horizental_stretch)
-        node_index = nodes[n]
-        parent_index = parents[n]
-        neuron.vertical_stretch(node_index, parent_index, p)
-        details = [0,0,0]
-        details[0] = node_index
-        details[1] = parent_index
-        details[2] = p
-        p_sym = 1
-        return p_sym, details
-
-    def do_horizental_stretching(self, neuron):
-        (branch_index,)  = np.where(neuron.branch_order==2)
-        (end_nodes,)  = np.where(neuron.branch_order==0)
-        nodes = np.append(branch_index,end_nodes)
-        parents = neuron.parent_index_for_node_subset(nodes)
-        n = np.floor(nodes.shape[0]*np.random.rand()).astype(int)
-        p = np.exp(np.random.normal() * self.horizental_stretch)
-        node_index = nodes[n]
-        parent_index = parents[n]
-        neuron.horizental_stretch(node_index, parent_index, p)
-        details = [0,0,0]
-        details[0] = node_index
-        details[1] = parent_index
-        details[2] = p
-        p_sym = 1
-        return p_sym, details
-
-    def select_proposal(self):
-        (I,) = np.where(self._consum_prob >= np.random.random_sample(1,))
-        p = min(I)
-        return p, self.p_list[p]
-
-    def do_sliding_certain_distance(self ,neuron):
-        branch_node = neuron.get_random_branching_node()
-        details = [0, 0]
-        if branch_node.node_type is not 'empty':
-            index_branch_node = neuron.get_index_for_no_soma_node(branch_node)
-            if(np.random.rand() < .5):
-                child = branch_node.children[0]
-            else:
-                child = branch_node.children[1]
-            child_of_branching_node_index = neuron.get_index_for_no_soma_node(child)
-            (I,) = np.where(~ np.isnan(neuron.connection[:, child_of_branching_node_index]))
-            I = np.append(I, index_branch_node)
-            far_nodes = self.far_nodes(neuron, index_branch_node, self.sliding_limit)
-            I = np.append(I, far_nodes)
-            order_one_node = neuron.get_random_order_one_node_not_in_certain_index(I)
-            if order_one_node.node_type is not 'empty':
-                order_one_node_index = neuron.get_index_for_no_soma_node(order_one_node)
-                distance_two_node = \
-                    LA.norm(neuron.location[:,order_one_node_index] - neuron.location[:,child_of_branching_node_index],2)
-                if(distance_two_node < self.sliding_limit):
-                    neuron.slide(child_of_branching_node_index, order_one_node_index)
-                    details[0] = child_of_branching_node_index
-                    details[1] = neuron.get_index_for_no_soma_node(branch_node)
-        p_sym = 1
-        return p_sym, details
-
-    def far_nodes(self, neuron, node_index, threshold):
-        x = neuron.location[0, :] - neuron.location[0, node_index]
-        y = neuron.location[1, :] - neuron.location[1, node_index]
-        z = neuron.location[2, :] - neuron.location[2, node_index]
-        (index,) = np.where(x**2 + y**2 + z**2 > threshold**2)
-        return index
-
-    def do_sliding_branch_certain_distance(self ,neuron):
-        """
-        It selects two positions in the neuron, one branching point and one order-one node, and cut one of the segments of the branching point and translate the whole segment (and all of
-        its dependency) to the order-one node.
-        """
-        branch_node = neuron.get_random_branching_node()
-        details = [0, 0]
-        if branch_node.node_type is not 'empty':
-            index_branch_node = neuron.get_index_for_no_soma_node(branch_node)
-            if(np.random.rand()<.5):
-                child = branch_node.children[0]
-            else:
-                child = branch_node.children[1]
-            child_of_branching_node_index = neuron.get_index_for_no_soma_node(child)
-            (I,) = np.where(~ np.isnan(neuron.connection[:, child_of_branching_node_index]))
-            I = np.append(I, index_branch_node)
-            far_nodes = self.far_nodes(neuron, index_branch_node, self.sliding_limit)
-            I = np.append(I, far_nodes)
-            order_one_node = neuron.get_random_order_one_node_not_in_certain_index(I)
-            if order_one_node.node_type is not 'empty':
-                order_one_node_index = neuron.get_index_for_no_soma_node(order_one_node)
-                if(LA.norm(neuron.location[:,order_one_node_index] - neuron.location[:,child_of_branching_node_index],2) < self.sliding_limit):
-                    neuron.slide(child_of_branching_node_index, order_one_node_index)
-                    details[0] = child_of_branching_node_index
-                    details[1] = neuron.get_index_for_no_soma_node(branch_node)
-        p_sym = 1
-        return p_sym, details
+        branch_order = neuron.features['branch order']
+        (I,) = np.where(branch_order[neuron.n_soma:] == 0)
+        I = I + neuron.n_soma
+        ext_red_list = np.zeros((3, len(branch_order)))
+        ext_red_list[0, I] = 1
+        ext_red_list[0, np.where(branch_order == 1)] = 1
+        ext_red_list[1, I] = 1
+        J = np.array([])
+        for i in I:
+            if branch_order[neuron.parent_index[i]] == 1:
+                J = np.append(J, i)
+        J = np.array(J, dtype=int)
+        ext_red_list[2, J] = 1
+        ext_red_list.astype(int)
+        ext_red_list[:, 0:neuron.n_soma] = 0
+        return ext_red_list
 
     def do_ext_red(self, neuron):
         """
@@ -440,7 +381,7 @@ class MCMC(object):
         Notice that there is not any limitation on the number of nodes that
         attached to the soma, but other nodes can at most have 2 children. """
         # neuron.set_ext_red_list()
-        L = neuron.ext_red_list
+        L = self.set_ext_red_list(neuron)
         (op, node_index) = self.select_non_zero_element_with_soma(L[0:2, :])
 
         if(op == 0): # extend the neuron by adding one node to the node
@@ -460,7 +401,7 @@ class MCMC(object):
         return p_sym, details
 
     def do_ext_red_end_points(self, neuron):
-        a = neuron.ext_red_list[1:3, :]
+        a = self.set_ext_red_list(neuron)[1:3, :]
         (op, node_index) = self.select_non_zero_element_without_soma(a)
         if(op == 0): # remove the end point
             p_current = self.p_remove_node(neuron)
@@ -492,30 +433,6 @@ class MCMC(object):
         else:
             p = p_whole/float(neuron.possible_ext_red_whole())
         return p
-
-    def do_sliding_branch(self, neuron):
-        """
-        It selects two positions in the neuron, one branching point and one order-one node, and cut one of the segments of the branching point and translate the whole segment (and all of
-        its dependency) to the order-one node.
-        """
-        branch_node = neuron.get_random_branching_node()
-        details = [0,0]
-        if branch_node.node_type is not 'empty':
-            if(np.random.rand()<.5):
-                child = branch_node.children[0]
-            else:
-                child = branch_node.children[1]
-            child_of_branching_node_index = neuron.get_index_for_no_soma_node(child)
-            (I,) = np.where(~ np.isnan(neuron.connection[:, child_of_branching_node_index]))
-            I = np.append(I, neuron.get_index_for_no_soma_node(branch_node))
-            order_one_node = neuron.get_random_order_one_node_not_in_certain_index(I)
-            if order_one_node.node_type is not 'empty':
-                order_one_node_index = neuron.get_index_for_no_soma_node(order_one_node)
-                neuron.slide(child_of_branching_node_index, order_one_node_index)
-                details[0] = child_of_branching_node_index
-                details[1] = neuron.get_index_for_no_soma_node(branch_node)
-        p_sym = 1
-        return p_sym, details
 
     def do_add_remove_node(self, neuron):
         """
@@ -555,63 +472,63 @@ class MCMC(object):
         #p_sym = self.pdf_normal(np.log(r), self.mean_ratio_diameter, 1)*self.pdf_normal(l,self.mean_loc, 3)
         return details
 
-    def do_location(self, neuron):
-        """
-        In the location of one of the branching point and accordingly the three segments of it changes with a piece-wise linear map.
-        """
-        if(neuron.is_soma()): # To make sure that there is at least one node in the no_soma list
-            index = 0
-            displace  = [0, 0, 0]
-        else:
-            index = neuron.choose_random_node_index()
-            displace = self.location * np.random.normal(size = 3)
-            neuron.change_location(index, displace)
-        p_sym = 1
-        return p_sym, [index, displace[0], displace[1], displace[2]]
+    # def do_location(self, neuron):
+    #     """
+    #     In the location of one of the branching point and accordingly the three segments of it changes with a piece-wise linear map.
+    #     """
+    #     if(neuron.is_soma()): # To make sure that there is at least one node in the no_soma list
+    #         index = 0
+    #         displace  = [0, 0, 0]
+    #     else:
+    #         index = neuron.choose_random_node_index()
+    #         displace = self.location * np.random.normal(size = 3)
+    #         neuron.change_location(index, displace)
+    #     p_sym = 1
+    #     return p_sym, [index, displace[0], displace[1], displace[2]]
 
-    def do_location_toward_end_nodes(self, neuron):
-        details = [0,0,0,0]
-        if(~neuron.is_soma()): # To make sure that there is at least one node in the no_soma list
-            index = neuron.choose_random_node_index()
-            displace = self.location_toward_cte * np.random.normal(size = 3)
-            neuron.change_location_toward_end_nodes(index,displace)
-            details[0] = index
-            details[1] = displace[0]
-            details[2] = displace[1]
-            details[3] = displace[2]
-        p_sym = 1
-        return p_sym, details
+    # def do_location_toward_end_nodes(self, neuron):
+    #     details = [0,0,0,0]
+    #     if(~neuron.is_soma()): # To make sure that there is at least one node in the no_soma list
+    #         index = neuron.choose_random_node_index()
+    #         displace = self.location_toward_cte * np.random.normal(size = 3)
+    #         neuron.change_location_toward_end_nodes(index,displace)
+    #         details[0] = index
+    #         details[1] = displace[0]
+    #         details[2] = displace[1]
+    #         details[3] = displace[2]
+    #     p_sym = 1
+    #     return p_sym, details
 
-    def do_location_important(self, neuron):
-        """
-        Change the location of one of the main points (end nodes or branchig
-        points).
-        """
-        index = neuron.get_index_for_no_soma_node(neuron.get_random_branching_or_end_node())
-        displace = self.location_important * np.random.normal(size=3)
-        neuron.change_location_important(index, displace)
-        p_sym = 1
-        return p_sym, [index, displace[0], displace[1], displace[2]]
+    # def do_location_important(self, neuron):
+    #     """
+    #     Change the location of one of the main points (end nodes or branchig
+    #     points).
+    #     """
+    #     index = neuron.get_index_for_no_soma_node(neuron.get_random_branching_or_end_node())
+    #     displace = self.location_important * np.random.normal(size=3)
+    #     neuron.change_location_important(index, displace)
+    #     p_sym = 1
+    #     return p_sym, [index, displace[0], displace[1], displace[2]]
 
-    def do_diameter(self, neuron):
-        if(neuron.is_soma()): # To make sure that there is at least one node in the no_soma list
-            index = 0
-            ratio = 1
-        else:
-            index = neuron.choose_random_node_index()
-            ratio = np.power(2,0.1*np.random.normal(0, 1, 1))
-            neuron.change_diameter(index, ratio)
-        return 1, [index, ratio]
+    # def do_diameter(self, neuron):
+    #     if(neuron.is_soma()): # To make sure that there is at least one node in the no_soma list
+    #         index = 0
+    #         ratio = 1
+    #     else:
+    #         index = neuron.choose_random_node_index()
+    #         ratio = np.power(2,0.1*np.random.normal(0, 1, 1))
+    #         neuron.change_diameter(index, ratio)
+    #     return 1, [index, ratio]
 
-    def do_diameter_toward(self, neuron):
-        if(neuron.is_soma()): # To make sure that there is at least one node in the no_soma list
-            index = 0
-            ratio = 1
-        else:
-            index = neuron.choose_random_node_index()
-            ratio = np.power(2,0.1*np.random.normal(0, 1, 1))
-            neuron.change_diameter_toward(index, ratio)
-        return 1, [index, ratio]
+    # def do_diameter_toward(self, neuron):
+    #     if(neuron.is_soma()): # To make sure that there is at least one node in the no_soma list
+    #         index = 0
+    #         ratio = 1
+    #     else:
+    #         index = neuron.choose_random_node_index()
+    #         ratio = np.power(2,0.1*np.random.normal(0, 1, 1))
+    #         neuron.change_diameter_toward(index, ratio)
+    #     return 1, [index, ratio]
 
     def do_rotation_general(self, neuron, kappa):
         matrix = self.random_unitary_basis(kappa)
@@ -624,16 +541,17 @@ class MCMC(object):
         return p_sym, details
 
     def do_rotation_branching(self, neuron, kappa):
-        node = neuron.get_random_branching_node()
-        details = [0,0]
-        if node.node_type is 'empty':
+        node = neuron.get_random_branching_node(neuron.features['branch order'])
+        details = [0, 0]
+        if node == -1:
             details[0] = neuron.get_random_no_soma_node()
             details[1] = np.eye(3)
 
         else:
-            node = node.children[np.floor(2*np.random.rand()).astype(int)]
+            (children, ) = np.where(neuron.parent_index == node)
+            node = children[np.floor(2*np.random.rand()).astype(int)]
             matrix = self.random_unitary_basis(kappa)
-            neuron.rotate_from_branch(node, matrix)
+            neuron.rotate(node, matrix)
             details[0] = node
             details[1] = matrix
         p_sym = 1
@@ -641,137 +559,298 @@ class MCMC(object):
 
     def do_sliding_general(self, neuron):
         details = [0, 0]
-        cutting_node = neuron.get_random_no_soma_node()
-        if(cutting_node.parent.return_type_name() is not 'soma'):
-            cutting_node_index = neuron.get_index_for_no_soma_node(cutting_node)
-            (I,) = np.where(~ np.isnan(neuron.connection[:, cutting_node_index]))
-            attaching_node = neuron.get_random_non_branch_node_not_in_certain_index(I)
-            if attaching_node.return_type_name() is not 'empty':
-                attaching_node_index = neuron.get_index_for_no_soma_node(attaching_node)
+        cutting_node_index = neuron.get_random_no_soma_node()
+
+        #matrix = self.random_unitary_basis(100)
+        #neuron.rotate(cutting_node_index, matrix)
+
+        if(cutting_node_index > neuron.n_soma):
+            I = neuron.connecting_after_node(cutting_node_index)
+            attaching_node_index = neuron.get_random_non_branch_node_not_in_certain_index(neuron.features['branch order'], I)
+            if attaching_node_index != -1:
                 details[0] = cutting_node_index
-                details[1] = neuron.get_index_for_no_soma_node(cutting_node.parent)
+                details[1] = neuron.parent_index[cutting_node_index]
                 neuron.slide(cutting_node_index, attaching_node_index)
         p_sym = 1
         return p_sym, details
 
-    def do_rescale_toward_end(self ,neuron):
-        details = [0,0]
-        node = neuron.get_random_no_soma_node()
-        details[0] = node
-        re = np.exp(np.random.normal(self.rescale_value))
-        details[1] = re
+    def do_sliding_end_node(self, neuron):
+        details = [0, 0]
+        cutting_node_index = neuron.get_random_no_soma_node()
+
+        matrix = self.random_unitary_basis(1)
+        neuron.rotate(cutting_node_index, matrix)
+
+        if(cutting_node_index > neuron.n_soma):
+            I = neuron.connecting_after_node(cutting_node_index)
+            (J,) = np.where(neuron.features['branch order'] >= 1)
+            K = np.append(I, J)
+            attaching_node_index = neuron.get_random_non_branch_node_not_in_certain_index(neuron.features['branch order'], K)
+            if attaching_node_index != -1:
+                details[0] = cutting_node_index
+                details[1] = neuron.parent_index[cutting_node_index]
+                neuron.slide(cutting_node_index, attaching_node_index)
+
         p_sym = 1
-        neuron.rescale_toward_end(node, re)
         return p_sym, details
 
-    def undo_MCMC(self, per, details):
+    def do_sliding_branch(self, neuron):
         """
-        when per == 0, details[0] is 'ext' of 'remove'. If it is 'ext', then details[1] is node_index.
-        if it is 'remove', details[1] = parent, details[2] = location, details[3] = ratio
+        It selects two positions in the neuron, one branching point and one order-one node, and cut one of the segments of the branching point and translate the whole segment (and all of
+        its dependency) to the order-one node.
         """
-        if per == 'extension/reduction': # undo extension/reduction
-            if(len(details) !=0):
-                if(details[0] == 'ext'):
-                    self.undo_ext(self.neuron, details[1])
-                if(details[0] == 'remove'):
-                    self.undo_red(self.neuron, details[1], details[2], details[3])
-        if per == 'extension/reduction end points':
-            if(len(details) !=0):
-                if(details[0] == 'ext'):
-                    self.undo_ext(self.neuron, details[1])
-                if(details[0] == 'remove'):
-                    self.undo_red(self.neuron, details[1], details[2], details[3])
+        branch_node = neuron.get_random_branching_node(neuron.features['branch order'])
 
-        if per == 'location': # undo location
-            if( ~ self.neuron.is_soma()):
-                self.undo_location(self.neuron, details[0], details[1], details[2], details[3]) # this function makes a location perturbation on the neuron
-        if per == 'location for important point': # undo location
-            if( ~ self.neuron.is_soma()):
-                self.undo_location_important(self.neuron, details[0], details[1], details[2], details[3]) # this function makes a location perturbation on the neuron
-        if per == 'location toward end':
-            if( ~ self.neuron.is_soma()):
-                self.undo_location_toward_end_nodes(self.neuron, details[0], details[1], details[2], details[3])
+        matrix = self.random_unitary_basis(1)
+        neuron.rotate(branch_node, matrix)
 
-        if per == 'diameter': # undo diameter
-            if( ~ self.neuron.is_soma()): # To make sure that there is at least one node in the no_soma list
-                self.undo_diameter(self.neuron, details[0], details[1])
+        details = [0,0]
+        if branch_node != -1:
+            (children, ) = np.where(neuron.parent_index == branch_node)
+            if(np.random.rand() < .5):
+                child = children[0]
+            else:
+                child = children[1]
+            I = neuron.connecting_after_node(child)
+            I = np.append(I, branch_node)
+            order_one_node = neuron.get_random_order_one_node_not_in_certain_index(neuron.features['branch order'], I)
+            if order_one_node != -1:
+                neuron.slide(child, order_one_node)
+                details[0] = child
+                details[1] = branch_node
 
-        if per == 'rotation for any node':
-            self.undo_rotation(self.neuron, details[0], details[1] )
-        if per == 'rotation for branching':
-            self.undo_rotation_from_branch(self.neuron, details[0], details[1] )
+        p_sym = 1
+        return p_sym, details
 
-        if per == 'sliding certain in distance': # undo sliding in certain distance
-            if(details[0] != 0):
-                self.undo_sliding(self.neuron, details[0], details[1])
-        if per == 'sliding for branching node': # undo sliding for branch
-            if(details[0] != 0):
-                self.undo_sliding(self.neuron, details[0], details[1])
-        if per == 'sliding general': # undo sliding general
-            if(details[0] != 0):
-                self.undo_sliding_general(self.neuron, details[0], details[1])
-        if per == 'sliding for branching node certain distance': # do sliding only for branch
-            if(details[0] != 0):
-                self.undo_sliding(self.neuron, details[0], details[1])
+    def do_sliding_certain_distance(self ,neuron):
+        """
+        It selects two positions in the neuron, one branching point and one order-one node, and cut one of the segments of the branching point and translate the whole segment (and all of
+        its dependency) to the order-one node.
+        """
+        details = [0, 0]
+        cutting_node_index = neuron.get_random_no_soma_node()
 
-        if per == 'rescale toward end':
-            self.undo_rescale_toward_end(self.neuron, details[0],details[1])
+        matrix = self.random_unitary_basis(1)
+        neuron.rotate(cutting_node_index, matrix)
 
-        if per == 'stretching vertical':
-            self.undo_vertical_stretching(self.neuron, details[0], details[1], details[2])
-        if per == 'stretching horizental':
-            self.undo_horizental_stretching(self.neuron, details[0], details[1], details[2])
+        if(cutting_node_index > neuron.n_soma):
+            I = neuron.connecting_after_node(cutting_node_index)
+            I = np.append(I, cutting_node_index)
+            far_nodes = self.far_nodes(neuron, cutting_node_index, self.sliding_limit)
+            I = np.append(I, far_nodes)
+            attaching_node_index = neuron.get_random_non_branch_node_not_in_certain_index(neuron.features['branch order'], I)
+            if attaching_node_index != -1:
+                details[0] = cutting_node_index
+                details[1] = neuron.parent_index[cutting_node_index]
+                neuron.slide(cutting_node_index, attaching_node_index)
+        p_sym = 1
+        return p_sym, details
 
-        if per == 'sinusidal':
-            self.undo_sinusidal_wave(self.neuron, details[0], details[1], details[2], details[3], details[4])
+    def do_sliding_branch_certain_distance(self, neuron):
+        branch_node = neuron.get_random_branching_node(neuron.features['branch order'])
 
-    def undo_sinusidal_wave(self, neuron, node, parent, hight, n_vertical, n_horizental):
-        neuron.sinudal(node_index, parent_index, -hight, n_vertical, n_horizental)
+        matrix = self.random_unitary_basis(1)
+        neuron.rotate(branch_node, matrix)
 
-    def undo_location(self, neuron, index, x, y, z):
-        neuron.change_location(index, - np.array([x,y,z]))
+        details = [0, 0]
+        if branch_node != -1:
+            (children, ) = np.where(neuron.parent_index == branch_node)
+            if(np.random.rand() < .5):
+                child = children[0]
+            else:
+                child = children[1]
+            I = neuron.connecting_after_node(child)
+            I = np.append(I, branch_node)
+            far_nodes = self.far_nodes(neuron, branch_node, self.sliding_limit)
+            I = np.append(I, far_nodes)
+            order_one_node = neuron.get_random_order_one_node_not_in_certain_index(neuron.features['branch order'], I)
+            if order_one_node != -1:
+                if(LA.norm(neuron.location[:, order_one_node] - neuron.location[:, child],2) < self.sliding_limit):
+                    neuron.slide(child, order_one_node)
+                    details[0] = child
+                    details[1] = branch_node
 
-    def undo_location_toward_end_nodes(self, neuron, index, x, y, z):
-        neuron.change_location_toward_end_nodes(index, - np.array([x,y,z]))
+        p_sym = 1
+        return p_sym, details
 
-    def undo_location_important(self, neuron, index, x, y, z):
-        neuron.change_location_important(index, - np.array([x,y,z]))
+#     def do_rescale_toward_end(self ,neuron):
+#         details = [0,0]
+#         node = neuron.get_random_no_soma_node()
+#         details[0] = node
+#         re = np.exp(np.random.normal(self.rescale_value))
+#         details[1] = re
+#         p_sym = 1
+#         neuron.rescale_toward_end(node, re)
+#         return p_sym, details
 
-    def undo_diameter(self, neuron, index, ratio):
-        neuron.change_diameter(index, 1.0 / ratio)
+#     def do_sinusidal_wave(self, neuron):
+#         """
+#         NOT READY
+#         """
+#         (branch_index,)  = np.where(neuron.branch_order==2)
+#         (end_nodes,)  = np.where(neuron.branch_order==0)
+#         nodes = np.append(branch_index,end_nodes)
+#         parents = neuron.parent_index_for_node_subset(nodes)
+#         n = np.floor(nodes.shape[0]*np.random.rand()).astype(int)
+#         node_index = nodes[n]
+#         parent_index = parents[n]
+#         hight = np.exp(np.random.normal() * self.sinusidal_hight)
 
-    def undo_ext(self, neuron, index_node):
-        neuron.remove_node(index_node)
+#         neuron.sinudal(node_index, parent_index, hight, n_vertical, n_horizental)
+#         details = [0,0,0]
+#         details[0] = node_index
+#         details[1] = parent_index
+#         details[2] = hight
+#         details[3] = n_vertical
+#         details[4] = n_horizental
+#         p_sym = 1
+#         return p_sym, details
 
-    def undo_red(self, neuron, parent, location, ratio):
-        neuron.extend_node(parent, location, ratio)
+#     def do_vertical_stretching(self, neuron):
+#         """
+#         In one of the segments that coming out from a branching points will be stretched.
+#         """
+#         (branch_index,)  = np.where(neuron.branch_order==2)
+#         (end_nodes,)  = np.where(neuron.branch_order==0)
+#         nodes = np.append(branch_index,end_nodes)
+#         parents = neuron.parent_index_for_node_subset(nodes)
+#         n = np.floor(nodes.shape[0]*np.random.rand()).astype(int)
+#         p = np.exp(np.random.normal() * self.horizental_stretch)
+#         node_index = nodes[n]
+#         parent_index = parents[n]
+#         neuron.vertical_stretch(node_index, parent_index, p)
+#         details = [0,0,0]
+#         details[0] = node_index
+#         details[1] = parent_index
+#         details[2] = p
+#         p_sym = 1
+#         return p_sym, details
 
-    def undo_rotation(self, neuron, node, matrix):
-        neuron.rotate(node, inv(matrix))
+#     def do_horizental_stretching(self, neuron):
+#         (branch_index,)  = np.where(neuron.branch_order==2)
+#         (end_nodes,)  = np.where(neuron.branch_order==0)
+#         nodes = np.append(branch_index,end_nodes)
+#         parents = neuron.parent_index_for_node_subset(nodes)
+#         n = np.floor(nodes.shape[0]*np.random.rand()).astype(int)
+#         p = np.exp(np.random.normal() * self.horizental_stretch)
+#         node_index = nodes[n]
+#         parent_index = parents[n]
+#         neuron.horizental_stretch(node_index, parent_index, p)
+#         details = [0,0,0]
+#         details[0] = node_index
+#         details[1] = parent_index
+#         details[2] = p
+#         p_sym = 1
+#         return p_sym, details
 
-    def undo_rotation_from_branch(self, neuron, node, matrix):
-        neuron.rotate_from_branch(node, inv(matrix))
+#     def undo_MCMC(self, per, details):
+#         """
+#         when per == 0, details[0] is 'ext' of 'remove'. If it is 'ext', then details[1] is node_index.
+#         if it is 'remove', details[1] = parent, details[2] = location, details[3] = ratio
+#         """
+#         if per == 'extension/reduction': # undo extension/reduction
+#             if(len(details) !=0):
+#                 if(details[0] == 'ext'):
+#                     self.undo_ext(self.neuron, details[1])
+#                 if(details[0] == 'remove'):
+#                     self.undo_red(self.neuron, details[1], details[2], details[3])
+#         if per == 'extension/reduction end points':
+#             if(len(details) !=0):
+#                 if(details[0] == 'ext'):
+#                     self.undo_ext(self.neuron, details[1])
+#                 if(details[0] == 'remove'):
+#                     self.undo_red(self.neuron, details[1], details[2], details[3])
 
-    def undo_sliding(self,
-                     neuron,
-                     child_of_branching_node_index,
-                     order_one_node_index):
-        neuron.slide(child_of_branching_node_index, order_one_node_index)
+#         if per == 'location': # undo location
+#             if( ~ self.neuron.is_soma()):
+#                 self.undo_location(self.neuron, details[0], details[1], details[2], details[3]) # this function makes a location perturbation on the neuron
+#         if per == 'location for important point': # undo location
+#             if( ~ self.neuron.is_soma()):
+#                 self.undo_location_important(self.neuron, details[0], details[1], details[2], details[3]) # this function makes a location perturbation on the neuron
+#         if per == 'location toward end':
+#             if( ~ self.neuron.is_soma()):
+#                 self.undo_location_toward_end_nodes(self.neuron, details[0], details[1], details[2], details[3])
 
-    def undo_sliding_general(self,
-                             neuron,
-                             child_of_branching_node_index,
-                             order_one_node_index):
-        neuron.slide(child_of_branching_node_index, order_one_node_index)
+#         if per == 'diameter': # undo diameter
+#             if( ~ self.neuron.is_soma()): # To make sure that there is at least one node in the no_soma list
+#                 self.undo_diameter(self.neuron, details[0], details[1])
 
-    def undo_rescale_toward_end(self, neuron, node, rescale):
-        neuron.rescale_toward_end(node, 1./rescale)
+#         if per == 'rotation for any node':
+#             self.undo_rotation(self.neuron, details[0], details[1] )
+#         if per == 'rotation for branching':
+#             self.undo_rotation_from_branch(self.neuron, details[0], details[1] )
 
-    def undo_vertical_stretching(self, neuron, node, parent, scale):
-        neuron.vertical_stretch(node, parent, 1./scale)
+#         if per == 'sliding certain in distance': # undo sliding in certain distance
+#             if(details[0] != 0):
+#                 self.undo_sliding(self.neuron, details[0], details[1])
+#         if per == 'sliding for branching node': # undo sliding for branch
+#             if(details[0] != 0):
+#                 self.undo_sliding(self.neuron, details[0], details[1])
+#         if per == 'sliding general': # undo sliding general
+#             if(details[0] != 0):
+#                 self.undo_sliding_general(self.neuron, details[0], details[1])
+#         if per == 'sliding for branching node certain distance': # do sliding only for branch
+#             if(details[0] != 0):
+#                 self.undo_sliding(self.neuron, details[0], details[1])
 
-    def undo_horizental_stretching(self, neuron, node, parent, scale):
-        neuron.horizental_stretch(node, parent, 1./scale)
+#         if per == 'rescale toward end':
+#             self.undo_rescale_toward_end(self.neuron, details[0],details[1])
+
+#         if per == 'stretching vertical':
+#             self.undo_vertical_stretching(self.neuron, details[0], details[1], details[2])
+#         if per == 'stretching horizental':
+#             self.undo_horizental_stretching(self.neuron, details[0], details[1], details[2])
+
+#         if per == 'sinusidal':
+#             self.undo_sinusidal_wave(self.neuron, details[0], details[1], details[2], details[3], details[4])
+
+#     def undo_sinusidal_wave(self, neuron, node, parent, hight, n_vertical, n_horizental):
+#         neuron.sinudal(node_index, parent_index, -hight, n_vertical, n_horizental)
+
+#     def undo_location(self, neuron, index, x, y, z):
+#         neuron.change_location(index, - np.array([x,y,z]))
+
+#     def undo_location_toward_end_nodes(self, neuron, index, x, y, z):
+#         neuron.change_location_toward_end_nodes(index, - np.array([x,y,z]))
+
+#     def undo_location_important(self, neuron, index, x, y, z):
+#         neuron.change_location_important(index, - np.array([x,y,z]))
+
+#     def undo_diameter(self, neuron, index, ratio):
+#         neuron.change_diameter(index, 1.0 / ratio)
+
+#     def undo_ext(self, neuron, index_node):
+#         neuron.remove_node(index_node)
+
+#     def undo_red(self, neuron, parent, location, ratio):
+#         neuron.extend_node(parent, location, ratio)
+
+#     def undo_rotation(self, neuron, node, matrix):
+#         neuron.rotate(node, inv(matrix))
+
+#     def undo_rotation_from_branch(self, neuron, node, matrix):
+#         neuron.rotate(node, inv(matrix))
+
+#     def undo_sliding(self,
+#                      neuron,
+#                      child_of_branching_node_index,
+#                      order_one_node_index):
+#         neuron.slide(child_of_branching_node_index, order_one_node_index)
+
+#     def undo_sliding_general(self,
+#                              neuron,
+#                              child_of_branching_node_index,
+#                              order_one_node_index):
+#         neuron.slide(child_of_branching_node_index, order_one_node_index)
+
+#     def undo_rescale_toward_end(self, neuron, node, rescale):
+#         neuron.rescale_toward_end(node, 1./rescale)
+
+#     def undo_vertical_stretching(self, neuron, node, parent, scale):
+#         neuron.vertical_stretch(node, parent, 1./scale)
+
+#     def undo_horizental_stretching(self, neuron, node, parent, scale):
+#         neuron.horizental_stretch(node, parent, 1./scale)
 
     def set_measure(self, features_distribution):
         """
@@ -873,6 +952,13 @@ class MCMC(object):
         pdf = rv.pdf(random_point)
         return random_point, pdf
 
+    def far_nodes(self, neuron, node_index, threshold):
+        x = neuron.location[0, :] - neuron.location[0, node_index]
+        y = neuron.location[1, :] - neuron.location[1, node_index]
+        z = neuron.location[2, :] - neuron.location[2, node_index]
+        (index,) = np.where(x**2 + y**2 + z**2 > threshold**2)
+        return index
+
     def random_vector(self, mean, var):
         vec = np.random.normal(size = 3)
         vec = vec/LA.norm(vec,2)
@@ -931,15 +1017,18 @@ class MCMC(object):
         return size*(2*np.random.rand(1,3)-1)
 
     def random_unitary_basis(self, kappa):
-        Ax1 = self.random_2d_rotation_in_3d('x', kappa)
-        Ay1 = self.random_2d_rotation_in_3d('y', kappa)
+        #Ax1 = self.random_2d_rotation_in_3d('x', kappa)
+        #Ay1 = self.random_2d_rotation_in_3d('y', kappa)
         Az1 = self.random_2d_rotation_in_3d('z', kappa)
-        Ax2 = self.random_2d_rotation_in_3d('x', kappa)
-        Ay1 = self.random_2d_rotation_in_3d('y', kappa)
-        Az1 = self.random_2d_rotation_in_3d('z', kappa)
-        A = np.dot(np.dot(Ax1,Ay1),Az1)
-        B = np.dot(np.dot(Az1,Ay1),Ax1)
-        return np.dot(A,B)
+        #Ax2 = self.random_2d_rotation_in_3d('x', kappa)
+        #Ay2 = self.random_2d_rotation_in_3d('y', kappa)
+        #Az2 = self.random_2d_rotation_in_3d('z', kappa)
+        #A = np.dot(np.dot(Ax1,Ay1),Az1)
+        #A = np.dot(np.dot(Az2,Ay2),Ax2)
+        #A = np.dot(Ax1,Ay1)
+        #B = np.dot(Ay2,Ax2)
+        #m = np.dot(A,B)
+        return Az1
 
     def random_2d_rotation_in_3d(self, axis, kappa):
         theta = np.random.vonmises(0, kappa, 1)
@@ -1010,7 +1099,7 @@ class MCMC(object):
         return details
 
     def accept_proposal(self, a):
-        return (a > np.random.random_sample(1,))[0]
+        return (a > np.random.random_sample(1,))[0] #(a >= 1)
 
     def select_non_zero_element_with_soma(self, matrix):
         soma = np.zeros([1, matrix.shape[1]])
@@ -1046,17 +1135,22 @@ class MCMC(object):
         return x, y
 
     def show_MCMC(self,start,size_x,size_y):
-        plt.figure(figsize=(size_x,size_y))
-        plt.subplot(1,4,1)
-        plt.plot(sum(self.trend[:,start:],0));
-        plt.subplot(1,4,2)
-        plt.plot(np.transpose(self.trend_normal[:,start:]));
+        fig = plt.figure(figsize=(size_x,size_y))
+        gs = gridspec.GridSpec(2,2)
+        ax = plt.subplot(gs[0])
+        ax.plot(sum(self.trend[:,start:],0));
+        ax.set_title('trend')
+        ax = plt.subplot(gs[1])
+        ax.plot(np.transpose(self.trend_normal[:,start:]));
+        ax.set_title('normalized trend')
         #plt.legend(self.list_features,bbox_to_anchor=(2.1,1.1))
-        plt.subplot(1,4,3)
-        plt.plot(np.transpose(self.trend[:,start:]));
-        plt.legend(self.list_features,bbox_to_anchor=(2.1,1.1))
-        plt.subplot(1,4,4)
-        plt.plot(np.convolve(self.acc, np.ones(30)))
+        ax = plt.subplot(gs[2])
+        ax.plot(np.transpose(self.trend[:,start:]));
+        ax.legend(self.list_features,bbox_to_anchor=(3.2,0))
+        ax.set_title('trend on features')
+        ax = plt.subplot(gs[3])
+        ax.plot(np.convolve(self.acc, np.ones(30))/30)
+        ax.set_title('acceptance rate')
 
     def check_MCMC(self, neuron, error_vec):
         """
