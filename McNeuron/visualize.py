@@ -10,7 +10,6 @@ from PIL import Image
 from numpy.linalg import inv
 from McNeuron import Neuron
 from McNeuron import subsample
-import neuron_util
 import tree_util
 import matplotlib
 from matplotlib import collections as mc
