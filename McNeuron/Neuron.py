@@ -71,7 +71,7 @@ class Neuron(object):
         """
         swc = np.zeros([self.n_node,7])
         swc[:, 0] = np.arange(self.n_node)+1
-        swc[:, 2] = self.nodes_type
+        swc[:, 1] = self.nodes_type
         swc[:, 2] = self.location[0, :]
         swc[:, 3] = self.location[1, :]
         swc[:, 4] = self.location[2, :]

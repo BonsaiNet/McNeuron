@@ -5,6 +5,57 @@ from McNeuron import tree_util
 from copy import deepcopy
 from sklearn import preprocessing
 
+
+def select_part_swc(swc_matrix, part='all'):
+    """
+    Parameters:
+    -----------
+    swc_matrix: numpy
+        Matrix of shape n*7
+
+    part: str
+        It can be: 'all', axon', 'basal', 'apical','dendrite'
+
+    Returns:
+    --------
+    swc matrix of the part of swc_matrix. Also return 0 if the selection is not possible.
+    """
+    if part == 'all':
+        return swc_matrix
+    elif part == 'axon':
+        return neuron_with_node_type(swc_matrix, index=[2])        
+    elif part == 'basal':
+        return neuron_with_node_type(swc_matrix, index=[3])        
+    elif part == 'apical':
+        return neuron_with_node_type(swc_matrix, index=[4])  
+    elif part == 'dendrite':
+        return neuron_with_node_type(swc_matrix, index=[3,4])  
+
+    
+def neuron_with_node_type(swc_matrix, index):
+    if(swc_matrix.shape[0]==0):
+        return swc_matrix
+    else:
+        swc_matrix[0,1] = 1
+        swc_matrix[swc_matrix[:,6]==-1,6] = 1
+        (soma,) = np.where(swc_matrix[:, 1] == 1)
+        all_ind = [np.where(swc_matrix[:, 1] == i)[0] for i in index]
+        l = sum([np.sign(len(i)) for i in all_ind])
+        nodes = np.sort(np.concatenate(all_ind))
+        subset = np.sort(np.append(soma, nodes))
+        labels_parent = np.unique(swc_matrix.astype(int)[swc_matrix.astype(int)[subset,6],1])
+        labels_parent = np.sort(np.delete(labels_parent, np.where(labels_parent==1)))
+        if len(nodes) == 0 or ~np.all(np.in1d(labels_parent, index)):
+            return 0 
+        else:
+            le = preprocessing.LabelEncoder()
+            le.fit(subset)
+            parent = le.transform(swc_matrix[subset[1:],6].astype(int))
+            new_swc = swc_matrix[subset,:]
+            new_swc[1:,6] = parent
+            return new_swc
+
+
 def subsample_swc(swc_matrix,
               subsample_type='nothing',
               length = 1):
@@ -233,6 +284,21 @@ class Subsample(object):
     def fit(self):
         """ set the setments and tree"""
         self.list_all_segment, self.tree = list_of_segments(self.swc_matrix)
+
+    def select_part_of_neuron(self, part):
+        """
+        Parameters:
+        -----------
+        part: str
+            It can be: 'all', axon', 'basal', 'apical','dendrite'         
+
+
+        Returns:    
+        --------
+        swc matrix of the part of swc_matrix. Also return 0 if the selection is not possible.
+
+        """ 
+        return select_part_swc(self.swc_matrix, part)
     
     def subsample(self, subsample_type='nothing', length = 1):
         """
