@@ -885,4 +885,8 @@ class Neuron(object):
         self.features['path_length/euclidean'] = path_length[self.n_soma:]/distance_from_root[self.n_soma:]
         self.features['mean Contraction'] = \
            np.array([((self.features['path_length/euclidean'] - 1.)).mean()])     
+<<<<<<< HEAD
         self.features['Branch Pt'] = np.array([len(num_branches)])
+=======
+        self.features['Branch Pt'] = np.array([len(num_branches)])
+>>>>>>> origin/master
