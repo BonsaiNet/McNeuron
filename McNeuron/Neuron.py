@@ -101,7 +101,7 @@ class Neuron:
         elif name == 'mcmc':
             self.mcmc_features()
         elif name == 'l_measure':
-            self.mcmc_features()
+            self.l_measure_features()
         elif name == 'motif':
             self.mcmc_features()
         elif name == 'all':
