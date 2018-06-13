@@ -592,7 +592,7 @@ class Neuron:
         (I,) = np.where(branch_order[self.n_soma:] == 2)
         I += self.n_soma
         if(len(I) != 0):
-            child_index = np.array(map(lambda i: list(np.where(self.parent_index==i)[0]), I)).T
+            child_index = np.array([list(np.where(self.parent_index==i)[0]) for i in I]).T
             vec0 = self.location[:, child_index[0, :]]-self.location[:, I]
             vec1 = self.location[:, child_index[1, :]] - self.location[:, I]
             vec2 = self.location[:, self.parent_index[I].astype(int)] - self.location[:, I]
@@ -627,7 +627,7 @@ class Neuron:
         """
         (I,) = np.where(branch_order[self.n_soma:] == 1)
         I = I + self.n_soma
-        child_index = map(lambda i: np.where(self.parent_index == i)[0][0], I)
+        child_index = [np.where(self.parent_index == i)[0][0] for i in I]
         dir1 = self.location[:, I] - self.location[:, self.parent_index[I]]
         dir2 = self.location[:, I] - self.location[:, child_index]
         local_angle = self.angle_vec_matrix(dir1, dir2)
