@@ -105,10 +105,10 @@ class Neuron:
         elif name == 'motif':
             self.mcmc_features()
         elif name == 'all':
-            self.toy_mcmc_features()
-            self.l_measure_features()
-            self.motif_features()
             self.geometrical_features()
+            self.toy_mcmc_features()
+            self.motif_features()
+            self.l_measure_features()
 
     def basic_features(self):
         """
@@ -249,7 +249,7 @@ class Neuron:
         branch_angle, side_angle = self.branch_angle(branch_order)
         curvature = self.set_curvature()
         #fractal = self.set_discrepancy(np.arange(.01, 5,.01))
-        main, parent_critical_point, path_length_critical, euclidean = \
+        self.main, self.parent_critical_point, path_length_critical, euclidean = \
             self.get_neural_and_euclid_lenght_critical_point(branch_order, distance_from_parent)
 
         self.features['global angle'] = global_angle[self.n_soma:]
@@ -278,7 +278,7 @@ class Neuron:
         #self.features['mean segmental neuronal/euclidean'] = \
         #   np.array([np.sqrt(((self.features['neuronal/euclidean for segments'] - 1.)**2).mean())])
         self.features['segmental branch angle'] = \
-           self.set_branch_angle_segment(main, parent_critical_point)
+           self.set_branch_angle_segment(self.main, self.parent_critical_point)
 
 
     def neural_distance_from_root(self, distance_from_parent):
@@ -849,10 +849,9 @@ class Neuron:
         and http://farsight-toolkit.org/wiki/L_Measure_functions
         L-measure consists of following measures:
         """
-        soma_indices = np.where(self.node_type==1)[0]
+        soma_indices = np.where(self.nodes_type==1)[0]
         self.set_branch_order()
-        branch_branch, branch_die, die_die, branching_stems = \
-            self.branching_type(main, parent_critical_point)
+        branch_branch, branch_die, die_die, branching_stems = self.branching_type(self.main, self.parent_critical_point)
         (num_branches,) = np.where(self.features['branch order'][self.n_soma:] >= 2)
         (tips,) = np.where(self.features['branch order'][self.n_soma:] == 0)
 
@@ -869,21 +868,18 @@ class Neuron:
         self.features['Skewness X'] = self.location[0,:].mean() - self.location[0,0]
         self.features['Skewness Y'] = self.location[1,:].mean() - self.location[1,0]
         self.features['Skewness Z'] = self.location[2,:].mean() - self.location[2,0]
-        self.features['Euclidain Skewness'] = \
-            np.sqrt(sum(self.features['Skewness X']**2 + \
-            self.features['Skewness Y']**2 + \
-            self.features['Skewness Z']))
-        self.features['Stems'] = self.branch_order[0]
+        # self.features['Euclidain Skewness'] = np.sqrt(sum(self.features['Skewness X']**2 + self.features['Skewness Y']**2 + self.features['Skewness Z']**2))
+        self.features['Stems'] = self.features['branch order'][0]
         self.features['Branching Stems'] = branching_stems
         self.features['Branch Pt'] = np.array([len(num_branches)])
         ## NOT CLEAR
-        self.features['Segments'] = 1
+        #self.features['Segments'] = 1
         self.features['Tips'] = np.array([len(tips)])
         self.features['Length'] = self.totalLength()
         self.features['Surface Area'] = self.surfaceArea()
-        self.features['Volume'] = 1
-        self.features['Burke Taper'] = 1
-        self.features['Hillman Taper'] = 1
+        self.features['Volume'] = self.volume()
+        #self.features['Burke Taper'] = 1
+        #self.features['Hillman Taper'] = 1
         self.features['Average Radius'] = self.diameter.mean()
     
     def totalLength(self) :
@@ -894,7 +890,7 @@ class Neuron:
                 length = length + np.sqrt(np.square(self.location[0][pI]-self.location[0][i]) + np.square(self.location[1][pI]-self.location[1][i]) + np.square(self.location[2][pI]-self.location[2][i]))       
         return length
     
-    def surfaceArea(self):
+    def surfaceArea(self) :
         sA = 0
         for i in range (1,np.shape(self.location[0])[0]) :
             pI = int(self.parent_index[i])
@@ -902,6 +898,15 @@ class Neuron:
                 h = np.sqrt(np.square(self.location[0][pI]-self.location[0][i]) + np.square(self.location[1][pI]-self.location[1][i]) + np.square(self.location[2][pI]-self.location[2][i]))       
                 sA = sA + 2*np.pi*self.diameter[i]*h
         return sA
+    
+    def volume(self) :
+        v = 0
+        for i in range (1,np.shape(self.location[0])[0]) :
+            pI = int(self.parent_index[i])
+            if(pI != -1) :
+                h = np.sqrt(np.square(self.location[0][pI]-self.location[0][i]) + np.square(self.location[1][pI]-self.location[1][i]) + np.square(self.location[2][pI]-self.location[2][i]))       
+                v = v + np.pi*np.square(self.diameter[i])*h
+        return v
     
     def toy_mcmc_features(self):
         self.set_branch_order()
@@ -913,3 +918,9 @@ class Neuron:
         self.features['mean Contraction'] = \
            np.array([((self.features['path_length/euclidean'] - 1.)).mean()])     
         self.features['Branch Pt'] = np.array([len(num_branches)])
+        
+        
+        
+        
+        
+        
