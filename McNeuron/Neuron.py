@@ -17,7 +17,6 @@ class Neuron:
     def __init__(self, input_file=None):
         """
         Making an Neuron object by inserting swc txt file or numpy array.
-
         Parameters:
         -----------
         input_file:
@@ -47,7 +46,6 @@ class Neuron:
         Reads matrix of swc format and asign these attributes:
         n_soma, n_node, nodes_list, location, nodes_type
         diameter, parent_index
-
         Parameters
         ----------
         input_file: numpy of shape [n, 7]
@@ -103,10 +101,14 @@ class Neuron:
         elif name == 'mcmc':
             self.mcmc_features()
         elif name == 'l_measure':
-            self.L_measure_features()
+            self.mcmc_features()
         elif name == 'motif':
+            self.mcmc_features()
+        elif name == 'all':
+            self.toy_mcmc_features()
+            self.l_measure_features()
             self.motif_features()
-        #self.geometrical_features()
+            self.geometrical_features()
 
     def basic_features(self):
         """
@@ -200,7 +202,6 @@ class Neuron:
             nodes_diameter
             parent_index
             location
-
         ext_red_list : array of shape = [3, n_node]
             first row: end points and order one nodes (for extension)
             second row: end points (for removing)
@@ -391,7 +392,6 @@ class Neuron:
     def imagary(self, bins=10, projection=[0,1,2], nodes_type='all'):
         """
         Imaging neuron on a lattice of given size.
-
         Parameters:
         -----------
         bins: int or list
@@ -402,12 +402,10 @@ class Neuron:
             to 'x', 'y' and 'z'.
         nodes_type: str
             it can be 'all', 'tips', 'branches' and 'tips and branches'
-
         Returns:
         --------
         image: numpy
             An array that shows the density of neuron in different locations.
-
         """
         dim = len(projection)
         if isinstance(bins, int):
@@ -435,7 +433,6 @@ class Neuron:
         """
         Counting the number of occupied boxes, when the location of neuron is approximated by
         equal boxes
-
         Parameters:
         -----------
         box_length: list (or numpy) of positive numbers
@@ -446,7 +443,6 @@ class Neuron:
             to 'x', 'y' and 'z'.
         nodes_type: str
             it can be 'all', 'tips', 'branches' and 'tips and branches'
-
         Return:
         -------
         precentage_list: numpy
@@ -467,7 +463,6 @@ class Neuron:
                nodes_type='all'):
         """
         Approximating the location of a neuron by equal sized boxes.
-
         Parameters:
         -----------
         box_length: float > 0
@@ -479,7 +474,6 @@ class Neuron:
             to 'x', 'y' and 'z'.
         nodes_type: str
             it can be 'all', 'tips', 'branches' and 'tips and branches'
-
         Returns:
         --------
         box: numpy
@@ -496,7 +490,6 @@ class Neuron:
     def projection_tips(self, projection, nodes_type='all'):
         """
         Retrning the location of the neuron (or its tips) for given projection.
-
         Parameters:
         -----------
         projection: list
@@ -504,7 +497,6 @@ class Neuron:
             to 'x', 'y' and 'z'.
         nodes_type: str
             it can be 'all', 'tips', 'branches' and 'tips and branches'
-
         """
         self.set_branch_order()
         if nodes_type=='all':
@@ -524,20 +516,17 @@ class Neuron:
         """
         Returning frequency of the number boxes that contain different number of nodes,
         When neuron is approximated by the boxes of given length.
-
         Parameters:
         -----------
         box_length: float > 0
             the length of box.
         nodes_type: str
             it can be 'all', 'tips', 'branches' and 'tips and branches'
-
         Return:
         -------
         n_box_vs_containing: numpy
             an array that at location k says how many boxes contain exatly k nodes of neuron
             (for 0 <= k <=  maximum number of nodes of neuron that a box can contain)
-
         """
         nodes_in_boxes = self.boxing(box_length=box_length,
                                      return_counts=True,
@@ -582,7 +571,6 @@ class Neuron:
         point Second and third rows are the angle betwen two outward segments
         and previous segment at the branching in arbitrary order (nan at other
         nodes).
-
         dependency:
             tree_util.branch_order
             self.location
@@ -714,7 +702,6 @@ class Neuron:
         size [n_node, n_node]. The element (i,j) is not np.nan if node i is a
         decendent of node j. The value at this array is the distance of j to
         its parent.
-
         dependency:
             self.nodes_list
             self.n_soma
@@ -786,7 +773,6 @@ class Neuron:
     def distance(self, index1, index2):
         """
         Neural distance between two nodes in the neuron.
-
         inputs
         ------
             index1, index2 : the indecies of the nodes.
@@ -831,11 +817,9 @@ class Neuron:
     def connecting_after_node(self, node_index):
         """
         Return the index of nodes after the given node toward the end nodes.
-
         Parameters
         ----------
         node: Node
-
         Returns
         -------
         index: numpy array
@@ -863,7 +847,6 @@ class Neuron:
         Measuring all the L-measure features of neuron.
         Ref: https://www.nature.com/articles/nprot.2008.51
         and http://farsight-toolkit.org/wiki/L_Measure_functions
-
         L-measure consists of following measures:
         """
         soma_indices = np.where(self.node_type==1)[0]
@@ -896,13 +879,29 @@ class Neuron:
         ## NOT CLEAR
         self.features['Segments'] = 1
         self.features['Tips'] = np.array([len(tips)])
-        self.features['Length'] = 1
-        self.features['Surface Area'] = 1
+        self.features['Length'] = self.totalLength()
+        self.features['Surface Area'] = self.surfaceArea()
         self.features['Volume'] = 1
         self.features['Burke Taper'] = 1
         self.features['Hillman Taper'] = 1
-        self.features['Volume'] = 1
         self.features['Average Radius'] = self.diameter.mean()
+    
+    def totalLength(self) :
+        length = 0
+        for i in range (0,np.shape(self.location[0])[0]) :
+            pI = int(self.parent_index[i])
+            if(pI != -1) :
+                length = length + np.sqrt(np.square(self.location[0][pI]-self.location[0][i]) + np.square(self.location[1][pI]-self.location[1][i]) + np.square(self.location[2][pI]-self.location[2][i]))       
+        return length
+    
+    def surfaceArea(self):
+        sA = 0
+        for i in range (1,np.shape(self.location[0])[0]) :
+            pI = int(self.parent_index[i])
+            if(pI != -1) :
+                h = np.sqrt(np.square(self.location[0][pI]-self.location[0][i]) + np.square(self.location[1][pI]-self.location[1][i]) + np.square(self.location[2][pI]-self.location[2][i]))       
+                sA = sA + 2*np.pi*self.diameter[i]*h
+        return sA
     
     def toy_mcmc_features(self):
         self.set_branch_order()
