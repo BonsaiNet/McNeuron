@@ -256,7 +256,7 @@ def show_features(self, size_x=15, size_y=17):
     plt.figure(figsize=(size_x, size_y))
     for name in self._show_hist.keys():
         plt.subplot(n, m, k)
-        print name
+        print(name)
         a = self.features[name]
         b = plt.hist(a[~np.isnan(a)], bins=self._show_hist[name], color='g')
         #plt.xlabel(self._show_legend_x[name])

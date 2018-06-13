@@ -7,9 +7,10 @@ import pandas as pd
 import pickle
 import re
 import json
-from urllib2 import Request, urlopen
+from urllib.request import urlopen
 from bs4 import BeautifulSoup
 from unidecode import unidecode
+from copy import deepcopy
 
 def get_dict_from_table(trs):
     table_dict = {}
@@ -251,10 +252,10 @@ def feature_matrix_from_neuromorpho(morph_data):
                           str_to_float=0)
     max_euc_dis = feature_ext(morph_data['Max Euclidean Distance'],
                           str_to_float=-3)
-    max_euc_dis[77536] = 4000
+  
     max_path_dis = feature_ext(morph_data['Max Path Distance'],
                           str_to_float=-3)
-    max_path_dis[77536] = 4000
+
     a = deepcopy(morph_data['Max Weight'])
     a[a=='Not reported'] = '0 grams'
     max_weigth = feature_ext(a,
@@ -268,20 +269,19 @@ def feature_matrix_from_neuromorpho(morph_data):
     n_stem = feature_ext(a,str_to_float=0)
     overal_depth = feature_ext(morph_data['Overall Depth'], str_to_float=-3)
     overal_heigth = feature_ext(morph_data['Overall Height'], str_to_float=-3)
-    overal_heigth[77536] = 50000
+
     overal_width = feature_ext(morph_data['Overall Width'], str_to_float=-3)
-    overal_width[77536] = 10000
+
     p_asym = feature_ext(morph_data['Partition Asymmetry'], str_to_float=0)
     a = morph_data['Soma Surface']
     a[a=='N/A'] = np.nan
     a[a=='Soma Surface'] = np.nan
     soma_surf = feature_ext(a, str_to_float=-4)
     tot_len = feature_ext(morph_data['Total Length'], str_to_float=-3)
-    tot_len[77536] = 80000
+
     tot_surf = feature_ext(morph_data['Total Surface'], str_to_float=-4)
-    tot_surf[77536] = 200000
+
     tot_vol = feature_ext(morph_data['Total Volume'], str_to_float=-4)
-    tot_vol[77536] = 20000
     tot_frag = feature_ext(morph_data['Total Fragmentation'], str_to_float=0)
 
     feature_matrix = np.zeros([morph_data.shape[0], 22])
@@ -309,4 +309,12 @@ def feature_matrix_from_neuromorpho(morph_data):
     feature_matrix[:,21] = tot_frag
 
     feature_matrix[np.isnan(feature_matrix)] = 0
+    if morph_data.shape[0] > 75000:
+        max_euc_dis[77536] = 4000
+        max_path_dis[77536] = 4000
+        overal_heigth[77536] = 50000
+        overal_width[77536] = 10000
+        tot_len[77536] = 80000    
+        tot_surf[77536] = 200000   
+        tot_vol[77536] = 20000
     return feature_matrix

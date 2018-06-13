@@ -2,9 +2,9 @@
 
 import numpy as np
 from numpy import linalg as LA
-from McNeuron import visualize
-import swc_util
-import dis_util
+import McNeuron.visualize
+import McNeuron.swc_util
+import McNeuron.dis_util
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from copy import deepcopy

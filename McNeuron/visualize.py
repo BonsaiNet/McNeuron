@@ -8,15 +8,15 @@ import matplotlib.animation as animation
 import pylab as pl
 from PIL import Image
 from numpy.linalg import inv
-from McNeuron import Neuron
-from McNeuron import subsample
-import tree_util
 import matplotlib
 from matplotlib import collections as mc
 from matplotlib.patches import Circle
 from matplotlib.collections import PatchCollection
 import itertools
 from copy import deepcopy
+import McNeuron.tree_util
+import McNeuron.Neuron
+import McNeuron.subsample
 sys.setrecursionlimit(10000)
 
 def get_2d_image(path, size, dpi, background, show_width):
@@ -220,7 +220,7 @@ def generate_data(path, scale_depth, n_camrea, kappa):
     """
     Data = []
     for i in range(len(path)):
-        print path[i]
+        print(path[i])
         neuron = Neuron(file_format = 'swc without attributes', input_file=path[i])
         if(len(neuron.nodes_list) != 0):
             for j in range(n_camrea):
@@ -457,12 +457,12 @@ def show_database(collection):
     for n in collection.database:
         plot_2D(n)
     for name in collection.value_all:
-        print name
+        print(name)
         print(collection.mean_value[name])
         print(collection.std_value[name])
         print('\n')
     for name in collection.hist_features.keys():
-        print name
+        print(name)
         m = collection.mean_hist[name]
         v = collection.std_hist[name]/10.
         plt.fill_between(x=collection.hist_features[name][1:], y1=m+v, y2=m-v)
@@ -474,7 +474,7 @@ def show_database(collection):
     plt.colorbar()
     plt.show()
     for name in collection.vec_value:
-        print name
+        print(name)
         m = collection.mean_vec_value[name]
         v = collection.std_vec_value[name]/10.
         plt.fill_between(x=range(0, len(m)), y1=m+v, y2=m-v)
@@ -493,7 +493,7 @@ def plot_confusion_matrix(cm, classes,
         cm = cm.astype('float').T / cm.sum(axis=1).astype('float')
         cm = cm.T
         cm = np.floor(cm*100.).astype(int)
-        print cm
+        print(cm)
 
     plt.imshow(cm, interpolation='nearest', cmap=cmap)
     plt.title(title)

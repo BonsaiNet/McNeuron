@@ -2,15 +2,14 @@
 
 import os
 import numpy as np
-from McNeuron import Neuron
-import subsample
-import visualize
-from copy import deepcopy
-import dis_util
 from copy import deepcopy
 import os
 import scipy.io
 import pickle
+import McNeuron.Neuron
+import McNeuron.subsample
+import McNeuron.visualize
+import McNeuron.dis_util
 
 def get_all_labels(path):
     loc4 = path + "text.mat"
@@ -232,10 +231,10 @@ class Collection(object):
                     n.set_features()
                     self.index = np.append(self.index, index)
                     self.database.append(n)
-                    print index
+                    print(index)
                 except:
                     print('ERROR IN:')
-                    print index
+                    print(index)
 
 #         if(input_format == 'Matrix of swc without Node class'):
 #             self.index = np.array([])

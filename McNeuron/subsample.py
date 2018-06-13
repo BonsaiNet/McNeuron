@@ -1,12 +1,15 @@
 """Collection of subsampling method on the neurons."""
 import numpy as np
 from numpy import linalg as LA
-from McNeuron import tree_util
 from copy import deepcopy
 from sklearn import preprocessing
+import pandas as pd
+import McNeuron.tree_util as tree_util 
 
 
-def select_part_swc(swc_matrix, part='all'):
+def select_part_swc(swc_matrix, 
+                    part='all',
+                    make_soma_one_node=False):
     """
     Parameters:
     -----------
@@ -15,46 +18,87 @@ def select_part_swc(swc_matrix, part='all'):
 
     part: str
         It can be: 'all', axon', 'basal', 'apical','dendrite'
+    
+    make_soma_one_node: boolean
+        return one node representation of soma.
 
     Returns:
     --------
     swc matrix of the part of swc_matrix. Also return 0 if the selection is not possible.
     """
     if part == 'all':
-        return swc_matrix
+        return neuron_with_node_type(swc_matrix, 
+                                     index=[2,3,4,5,6,7],
+                                make_soma_one_node=make_soma_one_node) 
     elif part == 'axon':
-        return neuron_with_node_type(swc_matrix, index=[2])        
+        return neuron_with_node_type(swc_matrix, 
+                                     index=[2],
+                                make_soma_one_node=make_soma_one_node)        
     elif part == 'basal':
-        return neuron_with_node_type(swc_matrix, index=[3])        
+        return neuron_with_node_type(swc_matrix, 
+                                     index=[3],
+                                make_soma_one_node=make_soma_one_node) 
     elif part == 'apical':
-        return neuron_with_node_type(swc_matrix, index=[4])  
+        return neuron_with_node_type(swc_matrix, 
+                                     index=[4],
+                                make_soma_one_node=make_soma_one_node)
     elif part == 'dendrite':
-        return neuron_with_node_type(swc_matrix, index=[3,4])  
+        return neuron_with_node_type(swc_matrix, 
+                                     index=[3,4,5,6,7],
+                                make_soma_one_node=make_soma_one_node)
 
     
-def neuron_with_node_type(swc_matrix, index):
+def neuron_with_node_type(swc_matrix, 
+                          index,
+                          make_soma_one_node):
+    swc_matrix = deepcopy(swc_matrix)
     if(swc_matrix.shape[0]==0):
         return swc_matrix
     else:
         swc_matrix[0,1] = 1
         swc_matrix[swc_matrix[:,6]==-1,6] = 1
         (soma,) = np.where(swc_matrix[:, 1] == 1)
+        if make_soma_one_node:
+            for i in soma[1:]:
+                parent_in_soma = np.where(swc_matrix[:,6]==i+1)[0]
+                swc_matrix[parent_in_soma, 6] = 1
+            soma = 0
         all_ind = [np.where(swc_matrix[:, 1] == i)[0] for i in index]
         l = sum([np.sign(len(i)) for i in all_ind])
         nodes = np.sort(np.concatenate(all_ind))
         subset = np.sort(np.append(soma, nodes))
-        labels_parent = np.unique(swc_matrix.astype(int)[swc_matrix.astype(int)[subset,6],1])
-        labels_parent = np.sort(np.delete(labels_parent, np.where(labels_parent==1)))
+        labels_parent = np.unique(\
+            swc_matrix.astype(int)[swc_matrix.astype(int)[subset,6],1])
+        labels_parent = np.sort(\
+            np.delete(labels_parent, np.where(labels_parent==1)))
         if len(nodes) == 0 or ~np.all(np.in1d(labels_parent, index)):
-            return 0 
+            return 0
+        
         else:
             le = preprocessing.LabelEncoder()
+            parent_subset = swc_matrix[subset[1:],6].astype(int)-1
+            ## Chnaging the parent of the nodes that their immediate parents
+            ## are not in the index (we replace their parent by the first grand parent that are in the index).
+            out_parent = np.where(pd.Series(swc_matrix[parent_subset, 1]).isin(index)==False)[0]
+            for i in range(len(out_parent)):
+                cur_par = parent_subset[i]
+                type_cur_par = swc_matrix[cur_par, 1]
+                be_in_index = pd.Series(type_cur_par).isin(index)[0]
+                be_in_tree = pd.Series(cur_par).isin(subset)[0]
+                while (be_in_tree==False) and (be_in_index==False):
+                    cur_par = int(swc_matrix[cur_par,6]-1)
+                    type_cur_par = swc_matrix[cur_par, 1]
+                    be_in_index = pd.Series(type_cur_par).isin(index)[0]
+                    be_in_tree = pd.Series(cur_par).isin(subset)[0]
+                parent_subset[i] =  cur_par
+                
+                
             le.fit(subset)
-            parent = le.transform(swc_matrix[subset[1:],6].astype(int))
+            parent = le.transform(parent_subset)
             new_swc = swc_matrix[subset,:]
-            new_swc[1:,6] = parent
+            new_swc[1:,6] = parent+1
+            new_swc[0,6] = -1
             return new_swc
-
 
 def subsample_swc(swc_matrix,
               subsample_type='nothing',

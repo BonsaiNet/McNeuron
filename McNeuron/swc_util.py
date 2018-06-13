@@ -201,7 +201,7 @@ def check_neuron(neuron):
             #     print(neuron.features[list_features[f]])
             #     print(a.sum())
             if(a.sum() > 0.):
-                print("The feature "+list_features[f] +
+                str("The feature "+list_features[f] +
                       " is not calculated correctly.")
                 cor = 0
     # if cor == 1:
@@ -380,8 +380,8 @@ def read_hoc_format(file_address):
                     elif('axon' in split[0]):
                         t = 2
                     else:
-                        print('undefined type for:')
-                        print name
+                        str('undefined type for:')
+                        str(name)
             except:
                 i = 0
     swc_matrix = make_standard_swc(swc_matrix)

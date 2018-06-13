@@ -3,16 +3,17 @@ import numpy as np
 from numpy import linalg as LA
 import math
 from scipy.sparse import csr_matrix
-from __builtin__ import str
 from copy import deepcopy
 from numpy.linalg import inv
 from sklearn import preprocessing
-from McNeuron import swc_util
-from McNeuron import tree_util
+import McNeuron.swc_util as swc_util
+import McNeuron.tree_util as tree_util
+import warnings
+warnings.filterwarnings(action='ignore', category=DeprecationWarning)
+
 # np.random.seed(0)
 
-
-class Neuron(object):
+class Neuron:
     def __init__(self, input_file=None):
         """
         Making an Neuron object by inserting swc txt file or numpy array.
@@ -56,8 +57,8 @@ class Neuron(object):
         self.nodes_type = np.array(self.nodes_type, dtype=int)
         self.n_node = swc_matrix.shape[0]
         self.location = swc_matrix[:, 2:5].T
-        # for i in range(3):
-        #     self.location[i, :] = self.location[i, :] - self.location[i, 0]
+        for i in range(3):
+            self.location[i, :] = self.location[i, :] - self.location[i, 0]
         (I,) = np.where(self.nodes_type == 1)
         self.n_soma = len(I)
         self.diameter = np.squeeze(swc_matrix[:, 5])
@@ -120,31 +121,35 @@ class Neuron(object):
         self.features['Nsoma'] = np.array([self.n_soma])
         (num_branches,) = np.where(self.features['branch order'][self.n_soma:] >= 2)
         self.features['Nbranch'] = np.array([len(num_branches)])
-        # (num_pass,) = np.where(self.features['branch order'][self.n_soma:] == 1)
-        # self.features['Npassnode'] = np.array([len(num_pass)])
         self.features['initial segments'] = np.array([self.features['branch order'][0]])
 
     def motif_features(self):
-        branch_order = tree_util.branch_order(self.parent_index)
+        self.set_branch_order()
+        branch_order = self.features['branch order']
+        (num_branches,) = np.where(self.features['branch order'][self.n_soma:] == 2)
+        (num_dead,) = np.where(self.features['branch order'][self.n_soma:] == 0)
         distance_from_parent = self.distance_from_parent()
 
-        main, parent_critical_point, neural, euclidean = \
-            self.get_neural_and_euclid_lenght_critical_point(branch_order, distance_from_parent)
-
+        critical_points, parent_critical_points = \
+            self.critical_points_and_their_parents(self.parent_index,
+                                                   branch_order)
         branch_branch, branch_die, die_die, branching_stems = \
-            self.branching_type(main, parent_critical_point)
+            self.branching_type(critical_points,
+                                parent_critical_points)
 
-        branch_depth, continue_depth, dead_depth, branch_branch_depth, branch_die_depth, die_die_depth = \
-            self.type_at_depth(branch_order, self.parent_index, branch_branch, branch_die, die_die)
-        main_parent = self.get_parent_index_of_subset(main, parent_critical_point)
+        branch_depth, continue_depth, dead_depth, \
+        branch_branch_depth, branch_die_depth, die_die_depth = \
+            self.type_at_depth(branch_order, 
+                              self.parent_index, 
+                              branch_branch, 
+                              branch_die, 
+                              die_die)
 
-        main_branch_depth, _, main_dead_depth, _, _, _ = \
-            self.type_at_depth(tree_util.branch_order(main_parent), main_parent)
+        self.features['number of branch'] = np.array([len(num_branches)])
+        self.features['number of dead'] = np.array([len(num_dead)])
         self.features['branch depth'] = branch_depth
         self.features['continue depth'] = continue_depth
         self.features['dead depth'] = dead_depth
-        self.features['main branch depth'] = main_branch_depth
-        self.features['main dead depth'] = main_dead_depth
         self.features['branch branch'] = np.array([len(branch_branch)])
         self.features['branch die'] = np.array([len(branch_die)])
         self.features['die die'] = np.array([len(die_die)])
@@ -152,12 +157,39 @@ class Neuron(object):
         self.features['branch die depth'] = branch_die_depth
         self.features['die die depth'] = die_die_depth
         self.features['branching stems'] = np.array([branching_stems])
-        self.features['all non trivial initials'] = np.array([self.all_non_trivial_initials()])
-        a = float(self.features['die die']*self.features['branch branch'])
-        asym = 0
-        if a != 0:
-            asym = float((4*self.features['branch die']**2))/a
-        self.features['asymmetric ratio'] = np.array([asym])
+        self.features['all non trivial initials'] =\
+            np.array([self.all_non_trivial_initials()])
+        
+        #a = float(self.features['die die']*self.features['branch branch'])
+    #         asym = 0
+    #         if a != 0:
+    #             asym = float((4*self.features['branch die']**2))/a
+    #         self.features['asymmetric ratio'] = np.array([asym])
+        #(num_pass,) = np.where(self.features['branch order'][self.n_soma:] == 1)
+        # self.features['Npassnode'] = np.array([len(num_pass)])
+
+
+    def branching_type(self, critical_points, parent_critical_points):
+        le1 = preprocessing.LabelEncoder()
+        le2 = preprocessing.LabelEncoder()
+
+        le1.fit(critical_points)
+        parent_critical_points_transform = le1.transform(parent_critical_points)
+        branch_critical_point = np.unique(parent_critical_points_transform)
+        parent_branch_critical_point = parent_critical_points_transform[branch_critical_point]
+
+        le2.fit(branch_critical_point)
+        parent_branch_critical_point_transform = le2.transform(parent_branch_critical_point)
+        branch_order_critical_point = tree_util.branch_order(parent_branch_critical_point_transform)
+
+        branch_branch = np.where(branch_order_critical_point[1:] == 2)[0] + 1
+        branch_die = np.where(branch_order_critical_point[1:] == 1)[0] + 1
+        branch_branch = le1.inverse_transform(le2.inverse_transform(branch_branch))
+        branch_die = le1.inverse_transform(le2.inverse_transform(branch_die))
+        die_die = np.setxor1d(np.setxor1d(np.unique(parent_critical_points)[1:], 
+                                          branch_branch), branch_die)
+        branching_stems = branch_order_critical_point[0]
+        return branch_branch, branch_die, die_die, branching_stems
 
     def geometrical_features(self):
         """
@@ -215,7 +247,7 @@ class Neuron(object):
         global_angle = self.global_angle()
         branch_angle, side_angle = self.branch_angle(branch_order)
         curvature = self.set_curvature()
-        fractal = self.set_discrepancy(np.arange(.01, 5,.01))
+        #fractal = self.set_discrepancy(np.arange(.01, 5,.01))
         main, parent_critical_point, path_length_critical, euclidean = \
             self.get_neural_and_euclid_lenght_critical_point(branch_order, distance_from_parent)
 
@@ -229,9 +261,9 @@ class Neuron(object):
         self.features['branch angle'] = branch_angle
         self.features['side branch angle'] = side_angle
         #self.features['curvature'] = curvature
-        self.features['discrepancy space'] = fractal[:,0]
-        self.features['self avoidance'] = fractal[:,1]
-        self.features['pictural image xy'] = self.set_pictural_xy()
+        #self.features['discrepancy space'] = fractal[:,0]
+        #self.features['self avoidance'] = fractal[:,1]
+        #self.features['pictural image xy'] = self.set_pictural_xy()
         #self.features['pictural image xyz'] = self.set_pictural_xyz(5., 5., 5.)
         #self.features['cylindrical density'] =
         #self.features['pictural image xy tips'] = self.set_pictural_tips(branch_order,10., 10.)
@@ -241,15 +273,12 @@ class Neuron(object):
            np.array([self.features['segmental neural length'].mean()])
         self.features['mean segmental euclidean length'] = \
            np.array([self.features['segmental euclidean length'].mean()])
-        self.features['neuronal/euclidean for segments'] = neural/euclidean
-        self.features['mean segmental neuronal/euclidean'] = \
-           np.array([np.sqrt(((self.features['neuronal/euclidean for segments'] - 1.)**2).mean())])
+        #self.features['neuronal/euclidean for segments'] = neural/euclidean
+        #self.features['mean segmental neuronal/euclidean'] = \
+        #   np.array([np.sqrt(((self.features['neuronal/euclidean for segments'] - 1.)**2).mean())])
         self.features['segmental branch angle'] = \
            self.set_branch_angle_segment(main, parent_critical_point)
 
-    def set_branch_order(self):
-        if 'branch order' not in self.features.keys():
-            self.features['branch order'] = tree_util.branch_order(self.parent_index)
 
     def neural_distance_from_root(self, distance_from_parent):
         a = np.arange(self.n_node)
@@ -284,33 +313,71 @@ class Neuron(object):
         parent = le.transform(parent_of_subset)
         return parent
 
-    def branching_type(self, critical_points, parent_critical_points):
-        le1 = preprocessing.LabelEncoder()
-        le2 = preprocessing.LabelEncoder()
-        le1.fit(critical_points)
-        parent_critical_points_transform = le1.transform(parent_critical_points)
-        branch_critical_point = np.unique(parent_critical_points_transform)
-        parent_branch_critical_point = parent_critical_points_transform[branch_critical_point]
-        le2.fit(branch_critical_point)
-        parent_branch_critical_point_transform = le2.transform(parent_branch_critical_point)
-        branch_order_critical_point = tree_util.branch_order(parent_branch_critical_point_transform)
-        branch_branch = np.where(branch_order_critical_point[1:] == 2)[0] + 1
-        branch_die = np.where(branch_order_critical_point[1:] == 1)[0] + 1
-        branch_branch = le1.inverse_transform(le2.inverse_transform(branch_branch))
-        branch_die = le1.inverse_transform(le2.inverse_transform(branch_die))
-        die_die = np.setxor1d(np.setxor1d(np.unique(parent_critical_points)[1:], branch_branch), branch_die)
-        branching_stems = branch_order_critical_point[0] - 1
-        return branch_branch, branch_die, die_die, branching_stems
+    def critical_points_and_their_parents(self,
+                                          parent_index,
+                                          branch_order):
+        (critical_points,) = np.where(branch_order[1:] != 1)
+        critical_points += 1
+        critical_points = np.append(0, critical_points)
+
+        parent_critical_points = np.array([], dtype=int)
+        for node in critical_points:
+            current_node = parent_index[node]
+            while current_node not in critical_points: 
+                current_node = parent_index[current_node]
+            parent_critical_points = np.append(parent_critical_points,
+                                               int(current_node))
+        return critical_points, parent_critical_points
+
+    def set_branch_order(self):
+        if 'branch order' not in self.features.keys():
+            self.features['branch order'] = tree_util.branch_order(self.parent_index)
+
+    def type_at_depth(self,
+                      branch_order,
+                      parent_index,
+                      branch_branch=[],
+                      branch_die=[],
+                      die_die=[]):
+        dead_index = np.where(branch_order == 0)[0]
+        continue_index = np.where(branch_order == 1)[0]
+        branch_index = np.where(branch_order == 2)[0]
+        depth_all = tree_util.dendogram_depth(parent_index).astype(int)
+        m = int(depth_all.max()+1)
+        branch_depth = np.zeros(m)
+        dead_depth = np.zeros(m)
+        continue_depth = np.zeros(m)
+        branch_branch_depth = np.zeros(m)
+        branch_die_depth = np.zeros(m)
+        die_die_depth = np.zeros(m)
+        unique, counts = np.unique(depth_all[dead_index], return_counts=True)
+        dead_depth[unique] = counts
+
+        unique, counts = np.unique(depth_all[branch_index], return_counts=True)
+        branch_depth[unique] = counts
+
+        unique, counts = np.unique(depth_all[continue_index], return_counts=True)
+        continue_depth[unique] = counts
+        if len(branch_branch) + len(branch_die) +  len(die_die) != 0:
+            unique, counts = np.unique(depth_all[branch_branch], return_counts=True)
+            branch_branch_depth[unique] = counts
+            unique, counts = np.unique(depth_all[branch_die], return_counts=True)
+            branch_die_depth[unique] = counts
+            unique, counts = np.unique(depth_all[die_die], return_counts=True)
+            die_die_depth[unique] = counts
+        return branch_depth, continue_depth, dead_depth, \
+    branch_branch_depth, branch_die_depth, die_die_depth
 
     def all_non_trivial_initials(self):
-        (I,)=np.where(self.parent_index==0)
-        count=0
-        for i in I:
-            if i!=0:
-                (J,)=np.where(self.parent_index == i)
-                if(len(J) != 0):
-                    count += 1
-        return count
+        (I,)=np.where(self.parent_index[self.n_soma:]==0)
+        # count=0
+        # for i in I:
+        #     if i!=0:
+        #         (J,)=np.where(self.parent_index == i)
+        #         if(len(J) != 0):
+        #             count += 1
+        # return count
+        return len(I)
 
     def make_fixed_length_vec(self, input_vec, length_vec):
         l = len(input_vec)
@@ -568,45 +635,6 @@ class Neuron(object):
             local_angle = np.array([0])
         return local_angle
 
-    def type_at_depth(self,
-                      branch_order,
-                      parent_index,
-                      branch_branch=[],
-                      branch_die=[],
-                      die_die=[]):
-        dead_index = np.where(branch_order == 0)[0]
-        continue_index = np.where(branch_order == 1)[0]
-        branch_index = np.where(branch_order == 2)[0]
-        depth_all = tree_util.dendrogram_depth(parent_index)
-
-        m = depth_all.max()+1
-        branch_depth = np.zeros(m)
-        dead_depth = np.zeros(m)
-        continue_depth = np.zeros(m)
-        branch_branch_depth = np.zeros(m)
-        branch_die_depth = np.zeros(m)
-        die_die_depth = np.zeros(m)
-
-        unique, counts = np.unique(depth_all[dead_index], return_counts=True)
-        dead_depth[unique] = counts
-
-        unique, counts = np.unique(depth_all[branch_index], return_counts=True)
-        branch_depth[unique] = counts
-
-        unique, counts = np.unique(depth_all[continue_index], return_counts=True)
-        continue_depth[unique] = counts
-
-        if len(branch_branch) + len(branch_die) +  len(die_die) != 0:
-            unique, counts = np.unique(depth_all[branch_branch], return_counts=True)
-            branch_branch_depth[unique] = counts
-
-            unique, counts = np.unique(depth_all[branch_die], return_counts=True)
-            branch_die_depth[unique] = counts
-
-            unique, counts = np.unique(depth_all[die_die], return_counts=True)
-            die_die_depth[unique] = counts
-
-        return branch_depth, continue_depth, dead_depth, branch_branch_depth, branch_die_depth, die_die_depth
 
     def set_frustum(self):
         """
