@@ -18,6 +18,7 @@ import McNeuron.tree_util
 import McNeuron.Neuron
 import McNeuron.subsample
 sys.setrecursionlimit(10000)
+from mpl_toolkits.mplot3d import Axes3D
 
 def get_2d_image(path, size, dpi, background, show_width):
 
@@ -342,6 +343,15 @@ def plot_2D(neuron,
         plt.savefig(save, format = "eps")
     if pass_ax is False:
         plt.show()
+        
+def plot_3D(neuron) :
+    loc = neuron.location
+    x = loc[0]
+    y = loc[1]
+    z = loc[2]
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.plot3D(x, y, z, 'red', linewidth="0.35")
 
 def plot_evolution_mcmc(mcmc):
     """

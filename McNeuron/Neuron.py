@@ -851,9 +851,7 @@ class Neuron:
         """
         soma_indices = np.where(self.nodes_type==1)[0]
         self.set_branch_order()
-        branch_branch, branch_die, die_die, branching_stems = self.branching_type(self.main, self.parent_critical_point)
-        (num_branches,) = np.where(self.features['branch order'][self.n_soma:] >= 2)
-        (tips,) = np.where(self.features['branch order'][self.n_soma:] == 0)
+        num_branches = np.where(self.features['branch order'][self.n_soma:] >= 2)
 
         self.features['Width X'] = max(self.location[0,:]) - min(self.location[0,:])
         self.features['Heigth Y'] = max(self.location[1,:]) - min(self.location[1,:])
@@ -862,25 +860,21 @@ class Neuron:
         self.features['Soma Y Position'] = self.location[1,0]
         self.features['Soma Z Position'] = self.location[2,0]
         self.features['Soma Radii'] = self.diameter[soma_indices].mean()
-        ## need to be corrected
-        self.features['Soma Surface Area'] = np.power(self.diameter[soma_indices],2).mean()
-        self.features['Soma Volume'] = np.power(self.diameter[soma_indices], 3).mean()
-        self.features['Skewness X'] = self.location[0,:].mean() - self.location[0,0]
-        self.features['Skewness Y'] = self.location[1,:].mean() - self.location[1,0]
-        self.features['Skewness Z'] = self.location[2,:].mean() - self.location[2,0]
-        # self.features['Euclidain Skewness'] = np.sqrt(sum(self.features['Skewness X']**2 + self.features['Skewness Y']**2 + self.features['Skewness Z']**2))
-        self.features['Stems'] = self.features['branch order'][0]
-        self.features['Branching Stems'] = branching_stems
-        self.features['Branch Pt'] = np.array([len(num_branches)])
-        ## NOT CLEAR
-        #self.features['Segments'] = 1
-        self.features['Tips'] = np.array([len(tips)])
+        self.features['Soma Surface Area'] = self.somaSurfaceArea(soma_indices)
+        self.features['Soma Volume'] = self.somaVolume(soma_indices)
+        self.features['Skewness X'] = np.abs(self.location[0,:].mean() - self.features['Soma X Position'])
+        self.features['Skewness Y'] = np.abs(self.location[1,:].mean() - self.features['Soma Y Position'])
+        self.features['Skewness Z'] = np.abs(self.location[2,:].mean() - self.features['Soma Z Position'])
         self.features['Length'] = self.totalLength()
         self.features['Surface Area'] = self.surfaceArea()
         self.features['Volume'] = self.volume()
-        #self.features['Burke Taper'] = 1
-        #self.features['Hillman Taper'] = 1
         self.features['Average Radius'] = self.diameter.mean()
+        self.features['Tips'] = np.shape(np.where(self.features['branch order'][self.n_soma:] == 0))[1]
+        self.features['Stems'] = self.features['branch order'][0] - len(soma_indices) + 1
+        self.features['Euclidain Skewness'] = np.sqrt(np.square(self.location[0,:].mean() - self.features['Soma X Position']) + np.square(self.location[1,:].mean() - self.features['Soma Y Position']) + np.square(self.location[2,:].mean() - self.features['Soma Z Position']))
+        self.features['Branch Pt'] = np.shape(np.where(self.features['branch order'][self.n_soma:] == 2))[1]
+        self.features['Segments'] = self.features['Branch Pt'] * 2
+        self.features['Elevation'] = self.elevation()
     
     def totalLength(self) :
         length = 0
@@ -889,6 +883,24 @@ class Neuron:
             if(pI != -1) :
                 length = length + np.sqrt(np.square(self.location[0][pI]-self.location[0][i]) + np.square(self.location[1][pI]-self.location[1][i]) + np.square(self.location[2][pI]-self.location[2][i]))       
         return length
+    
+    def somaSurfaceArea(self, soma_indices) :
+        sA = 0
+        for i in range (1,np.shape(soma_indices)[0]) :
+            pI = int(self.parent_index[soma_indices[i]])
+            if(pI != -1) :
+                h = np.sqrt(np.square(self.location[0][pI]-self.location[0][soma_indices[i]]) + np.square(self.location[1][pI]-self.location[1][soma_indices[i]]) + np.square(self.location[2][pI]-self.location[2][soma_indices[i]]))       
+                sA = sA + 2*np.pi*self.diameter[soma_indices[i]]*h
+        return sA
+    
+    def somaVolume(self, soma_indices) :
+        v = 0
+        for i in range (1,np.shape(soma_indices)[0]) :
+            pI = int(self.parent_index[soma_indices[i]])
+            if(pI != -1) :
+                h = np.sqrt(np.square(self.location[0][pI]-self.location[0][soma_indices[i]]) + np.square(self.location[1][pI]-self.location[1][soma_indices[i]]) + np.square(self.location[2][pI]-self.location[2][soma_indices[i]]))       
+                v = v + np.pi*np.square(self.diameter[soma_indices[i]])*h
+        return v
     
     def surfaceArea(self) :
         sA = 0
@@ -907,6 +919,16 @@ class Neuron:
                 h = np.sqrt(np.square(self.location[0][pI]-self.location[0][i]) + np.square(self.location[1][pI]-self.location[1][i]) + np.square(self.location[2][pI]-self.location[2][i]))       
                 v = v + np.pi*np.square(self.diameter[i])*h
         return v
+    
+    def elevation(self) :
+        e = [0] * np.shape(self.location[0])[0]
+        for i in range (1,np.shape(self.location[0])[0]) :
+            pI = int(self.parent_index[i])
+            if(pI != -1) :
+                b = np.sqrt(np.square(self.location[0][pI]-self.location[0][i]) + np.square(self.location[2][pI]-self.location[2][i]))
+                h = self.location[1][i] - self.location[1][pI]
+                e[i] = np.arctan(h/b) * 180 / np.pi
+        return e
     
     def toy_mcmc_features(self):
         self.set_branch_order()
