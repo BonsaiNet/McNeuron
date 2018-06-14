@@ -869,12 +869,15 @@ class Neuron:
         self.features['Surface Area'] = self.surfaceArea()
         self.features['Volume'] = self.volume()
         self.features['Average Radius'] = self.diameter.mean()
-        self.features['Tips'] = np.shape(np.where(self.features['branch order'][self.n_soma:] == 0))[1]
+        self.features['Tips'] = np.shape(np.where(self.features['branch order'] == 0))[1] - len(soma_indices) + 1
         self.features['Stems'] = self.features['branch order'][0] - len(soma_indices) + 1
         self.features['Euclidain Skewness'] = np.sqrt(np.square(self.location[0,:].mean() - self.features['Soma X Position']) + np.square(self.location[1,:].mean() - self.features['Soma Y Position']) + np.square(self.location[2,:].mean() - self.features['Soma Z Position']))
-        self.features['Branch Pt'] = np.shape(np.where(self.features['branch order'][self.n_soma:] == 2))[1]
+        self.features['Branch Pt'] = np.shape(np.where(self.features['branch order'] == 2))[1]
         self.features['Segments'] = self.features['Branch Pt'] * 2
-        self.features['Elevation'] = self.elevation()
+        self.features['Branching Indices'] = self.branchingIndices(np.where(self.features['branch order'] == 2))
+        self.features['Elevation'] = self.elevation(self.features['Branching Indices'])
+        self.features['Tilt Local'] = self.tiltLocal(self.features['Branching Indices'])
+        self.features['Amplitude Local'] = self.amplitudeLocal(self.features['Tilt Local'])
     
     def totalLength(self) :
         length = 0
@@ -920,16 +923,42 @@ class Neuron:
                 v = v + np.pi*np.square(self.diameter[i])*h
         return v
     
-    def elevation(self) :
-        e = [0] * np.shape(self.location[0])[0]
-        for i in range (1,np.shape(self.location[0])[0]) :
-            pI = int(self.parent_index[i])
+    def branchingIndices(self, branchPt) :
+        z = [0] * np.shape(branchPt)[1] * 2
+        counter = 0
+        for i in range (0,np.shape(self.parent_index)[0]) :
+            for j in range(0,np.shape(branchPt)[1]) :
+                if self.parent_index[i] == branchPt[0][j] :
+                    z[counter] = i
+                    counter+=1
+        return z
+    
+    def elevation(self, branchingIndices) :
+        e = [0] * np.shape(branchingIndices)[0]
+        for i in range (1,np.shape(e)[0]) :
+            pI = int(self.parent_index[branchingIndices[i]])
             if(pI != -1) :
-                b = np.sqrt(np.square(self.location[0][pI]-self.location[0][i]) + np.square(self.location[2][pI]-self.location[2][i]))
-                h = self.location[1][i] - self.location[1][pI]
-                e[i] = np.arctan(h/b) * 180 / np.pi
+                b = np.sqrt(np.square(self.location[0][branchingIndices[i]]-self.location[0][pI]) + np.square(self.location[2][branchingIndices[i]]-self.location[2][pI]))
+                h = self.location[1][branchingIndices[i]] - self.location[1][pI]
+                e[i] = np.arctan(h/b)
         return e
     
+    def tiltLocal(self, branchingIndices) :
+        t = [0] * np.shape(branchingIndices)[0]
+        for i in range (1,np.shape(t)[0]) :
+            pI = int(self.parent_index[branchingIndices[i]])
+            if(pI != -1) :
+                b = self.location[0][branchingIndices[i]]-self.location[0][pI]
+                h = np.square(self.location[2][pI]-self.location[2][branchingIndices[i]])
+                t[i] = np.arctan(h/b)
+        return t
+    
+    def amplitudeLocal(self, tiltLocal) :
+        a = [0] * int(np.shape(tiltLocal)[0] / 2)
+        for i in range (0,np.shape(a)[0]) :
+            a[i] = max([np.abs(tiltLocal[2*i] + tiltLocal[2*i+1]),np.abs(tiltLocal[2*i] - tiltLocal[2*i+1])])
+        return a
+        
     def toy_mcmc_features(self):
         self.set_branch_order()
         distance_from_parent = self.distance_from_parent()
