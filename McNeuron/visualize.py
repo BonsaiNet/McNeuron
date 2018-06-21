@@ -18,6 +18,7 @@ from copy import deepcopy
 import McNeuron.tree_util
 import McNeuron.Neuron
 import McNeuron.subsample
+
 sys.setrecursionlimit(10000)
 
 def get_2d_image(path, size, dpi, background, show_width):
@@ -358,6 +359,82 @@ def rotation_matrix(axis, theta):
                      [2*(bc-ad), aa+cc-bb-dd, 2*(cd+ab)],
                      [2*(bd+ac), 2*(cd-ab), aa+dd-bb-cc]])
 
+
+def plot_3D(neuron):
+    import plotly
+    import plotly.plotly as py
+    import plotly.graph_objs as go
+    N=neuron.n_node
+
+    Xe=[]
+    Ye=[]
+    Ze=[]
+    for e in range(1, N):
+        parent = neuron.parent_index[e]
+        Xe+=[neuron.location[0, e],neuron.location[0, parent], None]
+        Ye+=[neuron.location[1, e],neuron.location[1, parent], None]
+        Ze+=[neuron.location[2, e],neuron.location[2, parent], None]
+
+    trace1=go.Scatter3d(x=Xe,
+                   y=Ye,
+                   z=Ze,
+                   mode='lines',
+                   line=dict(color='rgb(125,125,125)', width=1),
+                   hoverinfo='none'
+                   )
+    trace2=go.Scatter3d(x=np.zeros(N),
+                   y=np.zeros(N),
+                   z=np.zeros(N),
+                   mode='markers',
+                   name='actors',
+                   marker=dict(symbol='dot',
+                                 size=6,
+                                 colorscale='Viridis',
+                                 line=dict(color='rgb(50,50,50)', width=0.5)
+                                 ),
+                   hoverinfo='text'
+                   )
+    axis=dict(showbackground=False,
+              showline=False,
+              zeroline=False,
+              showgrid=False,
+              showticklabels=False,
+              title=''
+              )
+
+
+    layout = go.Layout(
+             width=500,
+             height=500,
+             showlegend=False,
+             scene=dict(
+                 xaxis=dict(axis),
+                 yaxis=dict(axis),
+                 zaxis=dict(axis),
+            ),
+         margin=dict(
+            t=100
+        ),
+        hovermode='closest',
+        annotations=[
+               dict(
+               showarrow=False,
+                xref='paper',
+                yref='paper',
+                x=0,
+                y=0.1,
+                xanchor='left',
+                yanchor='bottom',
+                font=dict(
+                size=14
+                )
+                )
+            ],    )
+
+    data=[trace1, trace2]
+    fig=go.Figure(data=data, layout=layout)
+
+    return py.iplot(fig)
 
 def plot_evolution_mcmc(mcmc):
     """
