@@ -873,9 +873,9 @@ class Neuron:
         self.features['Width X'] = max(self.location[0,:]) - min(self.location[0,:])
         self.features['Heigth Y'] = max(self.location[1,:]) - min(self.location[1,:])
         self.features['Depth Z'] = max(self.location[2,:]) - min(self.location[2,:])
-        self.features['Soma X Position'] = self.somaPos(self.location[0][:], soma_indices)
-        self.features['Soma Y Position'] = self.somaPos(self.location[1][:], soma_indices)
-        self.features['Soma Z Position'] = self.somaPos(self.location[2][:], soma_indices)
+        self.features['Soma X Position'] = np.sum(self.location[0][:len(soma_indices)])/len(soma_indices)
+        self.features['Soma Y Position'] = np.sum(self.location[1][:len(soma_indices)])/len(soma_indices)
+        self.features['Soma Z Position'] = np.sum(self.location[2][:len(soma_indices)])/len(soma_indices)
         self.features['Soma Radii'] = self.diameter[soma_indices].mean()
         self.features['Soma Surface Area'] = self.somaSurfaceArea(soma_indices)
         self.features['Soma Volume'] = self.somaVolume(soma_indices)
@@ -884,7 +884,7 @@ class Neuron:
         self.features['Skewness Z'] = np.abs(self.location[2,:].mean() - self.features['Soma Z Position'])
         self.features['Length'] = self.totalLength()
         self.features['Surface Area'] = self.surfaceArea()
-        self.features['Section Area'] = self.sectionArea()
+        self.features['Section Area'] = np.sum(np.pi*(self.diameter[1:]**2))
         self.features['Volume'] = self.volume()
         self.features['Average Radius'] = self.diameter.mean()
         self.features['Tips'] = np.shape(np.where(self.features['branch order'][self.n_soma:] == 0))[1]
@@ -892,68 +892,45 @@ class Neuron:
         self.features['Euclidain Skewness'] = np.sqrt(np.square(self.location[0,:].mean() - self.features['Soma X Position']) + np.square(self.location[1,:].mean() - self.features['Soma Y Position']) + np.square(self.location[2,:].mean() - self.features['Soma Z Position']))
         self.features['Branch Pt'] = np.shape(np.where(self.features['branch order'][self.n_soma:] >= 2))[1]
         self.features['Segments'] = self.features['Branch Pt'] * 2
-        self.features['Branching Indices'] = self.branchingIndices(np.where(self.features['branch order'] == 2)[0])
-        self.features['Elevation'] = self.elevation(self.features['Branching Indices'])
-        self.features['Tilt Local'] = self.tiltLocal(self.features['Branching Indices'])
-        self.features['Amplitude Local'] = self.amplitudeLocal(self.features['Tilt Local'])
-    
-    def somaPos(self, a, soma_indices) :
-        sum = 0
-        for i in range(0,len(soma_indices)) :
-            sum = sum + a[soma_indices[i]]
-        return sum/len(soma_indices)
-        
+        #self.features['Branching Indices'] = self.branchingIndices(np.where(self.features['branch order'] == 2)[0])
+        #self.features['Elevation'] = self.elevation(self.features['Branching Indices'])
+        #self.features['Tilt Local'] = self.tiltLocal(self.features['Branching Indices'])
+        #self.features['Amplitude Local'] = self.amplitudeLocal(self.features['Tilt Local'])
+
     def totalLength(self) :
-        length = 0
-        for i in range (0,np.shape(self.location[0])[0]) :
-            pI = int(self.parent_index[i])
-            if(pI != -1) :
-                length = length + np.sqrt(np.square(self.location[0][pI]-self.location[0][i]) + np.square(self.location[1][pI]-self.location[1][i]) + np.square(self.location[2][pI]-self.location[2][i]))       
-        return length
+        p = self.parent_index
+        x = self.location[0, :] - self.location[0, p]
+        y = self.location[1, :] - self.location[1, p]
+        z = self.location[2, :] - self.location[2, p]
+        return np.sum(np.sqrt(x**2 + y**2 + z**2))
     
     def somaSurfaceArea(self, soma_indices) :
-        sA = 0
-        for i in range (1,np.shape(soma_indices)[0]) :
-            pI = int(self.parent_index[soma_indices[i]])
-            if(pI != -1) :
-                h = np.sqrt(np.square(self.location[0][pI]-self.location[0][soma_indices[i]]) + np.square(self.location[1][pI]-self.location[1][soma_indices[i]]) + np.square(self.location[2][pI]-self.location[2][soma_indices[i]]))       
-                sA = sA + 2*np.pi*self.diameter[soma_indices[i]]*h
-        return sA
+        p = self.parent_index
+        x = self.location[0, soma_indices] - self.location[0, p[soma_indices]]
+        y = self.location[1, soma_indices] - self.location[1, p[soma_indices]]
+        z = self.location[2, soma_indices] - self.location[2, p[soma_indices]]
+        return np.sum(2*np.pi*np.sqrt(x**2 + y**2 + z**2)*self.diameter[soma_indices])
     
     def somaVolume(self, soma_indices) :
-        v = 0
-        for i in range (1,np.shape(soma_indices)[0]) :
-            pI = int(self.parent_index[soma_indices[i]])
-            if(pI != -1) :
-                h = np.sqrt(np.square(self.location[0][pI]-self.location[0][soma_indices[i]]) + np.square(self.location[1][pI]-self.location[1][soma_indices[i]]) + np.square(self.location[2][pI]-self.location[2][soma_indices[i]]))       
-                v = v + np.pi*np.square(self.diameter[soma_indices[i]])*h
-        return v
+        p = self.parent_index
+        x = self.location[0, soma_indices] - self.location[0, p[soma_indices]]
+        y = self.location[1, soma_indices] - self.location[1, p[soma_indices]]
+        z = self.location[2, soma_indices] - self.location[2, p[soma_indices]]
+        return np.sum(np.pi*self.diameter[soma_indices]**2*np.sqrt(x**2 + y**2 + z**2))
     
-    def surfaceArea(self) :
-        sA = 0
-        for i in range (1,np.shape(self.location[0])[0]) :
-            pI = int(self.parent_index[i])
-            if(pI != -1) :
-                h = np.sqrt(np.square(self.location[0][pI]-self.location[0][i]) + np.square(self.location[1][pI]-self.location[1][i]) + np.square(self.location[2][pI]-self.location[2][i]))       
-                sA = sA + 2*np.pi*self.diameter[i]*h
-        return sA
-    
-    def sectionArea(self) :
-        sA = 0
-        for i in range (1,np.shape(self.location[0])[0]) :
-            pI = int(self.parent_index[i])
-            if(pI != -1) :      
-                sA = sA + np.pi*np.square(self.diameter[i])
-        return sA
+    def surfaceArea(self):
+        p = self.parent_index
+        x = self.location[0, :] - self.location[0, p]
+        y = self.location[1, :] - self.location[1, p]
+        z = self.location[2, :] - self.location[2, p]
+        return np.sum(2*np.pi*np.sqrt(x**2 + y**2 + z**2)*self.diameter)
     
     def volume(self) :
-        v = 0
-        for i in range (1,np.shape(self.location[0])[0]) :
-            pI = int(self.parent_index[i])
-            if(pI != -1) :
-                h = np.sqrt(np.square(self.location[0][pI]-self.location[0][i]) + np.square(self.location[1][pI]-self.location[1][i]) + np.square(self.location[2][pI]-self.location[2][i]))       
-                v = v + np.pi*np.square(self.diameter[i])*h
-        return v
+        p = self.parent_index
+        x = self.location[0, :] - self.location[0, p]
+        y = self.location[1, :] - self.location[1, p]
+        z = self.location[2, :] - self.location[2, p]
+        return np.sum(np.pi*self.diameter**2*np.sqrt(x**2 + y**2 + z**2))
     
     def branchingIndices(self, branchPt) :
         z = []
@@ -961,29 +938,20 @@ class Neuron:
             for j in range(0,len(branchPt)) :
                 if self.parent_index[i] == branchPt[j] :
                     z = np.append(z, i)
-        return z
+        return z.astype(int)
 
     def elevation(self, branchingIndices) :
-        e = [0] * np.shape(branchingIndices)[0]
-        for i in range (1,np.shape(e)[0]) :
-            bI = int(branchingIndices[i])
-            pI = int(self.parent_index[bI])
-            if(pI != -1) :
-                b = np.sqrt(np.square(self.location[0][bI]-self.location[0][pI]) + np.square(self.location[2][bI]-self.location[2][pI]))
-                h = self.location[1][bI] - self.location[1][pI]
-                e[i] = np.arctan(h/b)
-        return e
+        p = self.parent_index
+        x = self.location[0, branchingIndices] - self.location[0, p[branchingIndices]]
+        y = self.location[1, branchingIndices] - self.location[1, p[branchingIndices]]
+        z = self.location[2, branchingIndices] - self.location[2, p[branchingIndices]]
+        return np.arctan(y/(np.sqrt(x**2 + z**2)))
     
     def tiltLocal(self, branchingIndices) :
-        t = [0] * np.shape(branchingIndices)[0]
-        for i in range (1,np.shape(t)[0]) :
-            bI = int(branchingIndices[i])
-            pI = int(self.parent_index[bI])
-            if(pI != -1) :
-                b = self.location[0][bI]-self.location[0][pI]
-                h = self.location[2][bI]-self.location[2][pI]
-                t[i] = np.arctan(h/b)
-        return t
+        p = self.parent_index
+        x = self.location[0, branchingIndices] - self.location[0, p[branchingIndices]]
+        z = self.location[2, branchingIndices] - self.location[2, p[branchingIndices]]
+        return np.arctan(z/x)
     
     def amplitudeLocal(self, tiltLocal) :
         a = [0] * int(np.shape(tiltLocal)[0] / 2)
@@ -1015,12 +983,12 @@ class Neuron:
         n = np.append(n,self.features['Stems'])
         n = np.append(n,self.features['Branch Pt'])
         n = np.append(n,self.features['Segments'])
-        e = np.histogram(self.features['Elevation'], range=(-np.pi/2, np.pi/2), bins=10)[0]
-        t = np.histogram(self.features['Tilt Local'], range=(-np.pi/2, np.pi/2), bins=10)[0]
-        a = np.histogram(self.features['Amplitude Local'], range=(0, np.pi), bins = 10)[0]
-        n = np.append(n, (e/sum(e)))
-        n = np.append(n, (t/sum(t)))
-        n = np.append(n, (a/sum(a)))
+        #e = np.histogram(self.features['Elevation'], range=(-np.pi/2, np.pi/2), bins=10)[0]
+        #t = np.histogram(self.features['Tilt Local'], range=(-np.pi/2, np.pi/2), bins=10)[0]
+        #a = np.histogram(self.features['Amplitude Local'], range=(0, np.pi), bins = 10)[0]
+        #n = np.append(n, (e/sum(e)))
+        #n = np.append(n, (t/sum(t)))
+        #n = np.append(n, (a/sum(a)))
         
         return n
         
