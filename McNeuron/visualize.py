@@ -13,12 +13,13 @@ from matplotlib import collections as mc
 from matplotlib.patches import Circle
 from matplotlib.collections import PatchCollection
 import itertools
+import math
 from copy import deepcopy
 import McNeuron.tree_util
 import McNeuron.Neuron
 import McNeuron.subsample
+
 sys.setrecursionlimit(10000)
-from mpl_toolkits.mplot3d import Axes3D
 
 def get_2d_image(path, size, dpi, background, show_width):
 
@@ -230,26 +231,27 @@ def generate_data(path, scale_depth, n_camrea, kappa):
     return Data
 
 def plot_2D(neuron,
-            background=1,
             show_width=False,
-            show_depth=False,
-            size_x=5,
-            size_y=5,
-            dpi=80,
-            line_width=1,
             show_soma=False,
-            give_image=False,
-            red_after=False,
-            node_red=0,
-            translation=(0, 0),
-            scale_on=False,
+            line_width=1,
+            node_index_red_after=-1,
+            node_color=[],
+            shift=(0, 0),
             scale=(1, 1),
             save=[],
             pass_ax=False,
-            projection=np.eye(3),
+            axis=[1,0,0],
+            rotation=0,
             ax=''):
     """
     Plotting a neuron. 
+    
+    Parameters:
+    -----------
+    neuron: numpy or Neuron object
+        If it is numpy it should have swc structure.
+        
+        
     """
     if isinstance(neuron, np.ndarray):
         location = neuron[:,2:5].T
@@ -259,99 +261,180 @@ def plot_2D(neuron,
         n_node = neuron.shape[0]
         n_soma = len(np.where(neuron[:,1]==1)[0])
     else:
-        location = neuron.location
+        location = deepcopy(neuron.location)
         widths= neuron.diameter
         parent_index = neuron.parent_index
         n_node = neuron.n_node
         n_soma = neuron.n_soma
 
-    depth = location[2, :]
-    p = deepcopy(location)
-    p = np.dot(projection, p)
-    if scale_on:
-        p[0, :] = scale[0] * (p[0, :]-min(p[0, :]))/(max(p[0, :]) - min(p[0, :]))
-        p[1, :] = scale[1] * (p[1, :]-min(p[1, :]))/(max(p[1, :]) - min(p[1, :]))
+    projection = rotation_matrix(axis=axis,
+                                 theta=rotation)
+    location = np.dot(projection, location)
+    location[0, :] = location[0,:]-min(location[0,:])
+    location[1, :] = location[1,:]-min(location[1,:])
     
-
-    m = min(depth)
-    M = max(depth)
-    depth = background * ((depth - m)/(M-m))
     colors = []
     lines = []
     patches = []
+    
+    # Adding width
+    linewidths = line_width*np.ones(n_node)
+    if show_width:
+        linewidths = widths*linewidths
 
+    # Making red after a node
+    if node_index_red_after >=0:
+        red_index = neuron.connecting_after_node(node_index_red_after)
+    else:
+        red_index=[]
+   
+    # Making line for each edge
+    for i in range(n_node):
+        if bool(np.isin(i , red_index)):
+            colors.append('r')
+        else:
+            colors.append('k')
+            
+        j = int(parent_index[i])
+        lines.append([(location[0,i] + shift[0],
+                       location[1,i] + shift[1]),
+                      (location[0,j] + shift[0],
+                       location[1,j] + shift[1])])
+    if len(node_color) > 0:
+        colors = node_color
+    lc = mc.LineCollection(lines,
+                           linewidths=linewidths,
+                           color=colors)
+    # Making Soma
     for i in range(n_soma):
-        x1 = location[0, i] + translation[0]
-        y1 = location[1, i] + translation[1]
+        x1 = location[0, i] + shift[0]
+        y1 = location[1, i] + shift[1]
         r = widths[i]
-        circle = Circle((x1, y1), r, color=str(depth[i]), ec='none', fc='none')
+        circle = Circle((x1, y1),
+                        r, 
+                        color='b',
+                        ec='none', 
+                        fc='none')
         patches.append(circle)
 
     pa = PatchCollection(patches, cmap=matplotlib.cm.gray)
-    pa.set_array(depth[0]*np.zeros(n_soma))
-
-    for i in range(n_node):
-        colors.append(str(depth[i]))
-        j = int(parent_index[i])
-        lines.append([(p[0,i] + translation[0],p[1,i] + translation[1]),(p[0,j] + translation[0],p[1,j] + translation[1])])
-
-    if(show_width):
-        if(show_depth):
-            lc = mc.LineCollection(lines, colors=colors, linewidths = line_width*widths)
-        else:
-            lc = mc.LineCollection(lines, linewidths = line_width*widths)
+    pa.set_array(widths[0]*np.zeros(n_soma))
+    
+    if pass_ax is False:
+        fig, ax = plt.subplots()
+        ax.add_collection(lc)
+        if(show_soma):
+            ax.add_collection(pa)
+        plt.axis('off')
+        plt.xlim((-.001, max(location[0,:])+.001))
+        plt.ylim((-.001, max(location[1,:])+.001))
     else:
-        if(show_depth):
-            lc = mc.LineCollection(lines, colors=colors, linewidths = line_width)
-        else:
-            lc = mc.LineCollection(lines, linewidths=line_width, color = 'k')
-
-    if(red_after):
-        colors = np.zeros(len(lines))
-        I = neuron.connecting_after_node(node_red)
-        colors[I] = 1
-        #lc = mc.LineCollection(lines, color=colors)
-        # for i in I1:
-        #     j = neuron.parent_index[i]
-        #     line1.append([(p[0,i],p[1,i]),(p[0,j],p[1,j])])
-        #     lc1 = mc.LineCollection(line1, linewidths = 2*line_width, color = 'r')
-        # for i in I2:
-        #     j = neuron.parent_index[i]
-        #     line2.append([(p[0,i],p[1,i]),(p[0,j],p[1,j])])
-        #     lc2 = mc.LineCollection(line2, linewidths = line_width, color = 'k')
-            #return (lc1, lc2, (min(p[0,:]),max(p[0,:])), (min(p[1,:]),max(p[1,:])))
-        #else:
-            #return (lc, (min(p[0,:]),max(p[0,:])), (min(p[1,:]),max(p[1,:])))
-    else:
-        if pass_ax is False:
-            fig, ax = plt.subplots()
-            ax.add_collection(lc)
-            if(show_soma):
-                ax.add_collection(pa)
-            fig.set_size_inches([size_x + 1, size_y + 1])
-            fig.set_dpi(dpi)
-            plt.axis('off')
-            plt.xlim((min(p[0,:])-.001,max(p[0,:])+.001))
-            plt.ylim((min(p[1,:])-.001,max(p[1,:])+.001))
-        else:
-            ax.add_collection(lc)
-            ax.axis('off')
-            ax.set_xlim((min(p[0,:])-.001,max(p[0,:])+.001))
-            ax.set_ylim((min(p[1,:])-.001,max(p[1,:])+.001))
+        ax.add_collection(lc)
+        ax.axis('off')
+        ax.set_xlim((-.01,max(location[0,:])+.01))
+        ax.set_ylim((-.01,max(location[1,:])+.01))
             
     if(len(save)!=0):
         plt.savefig(save, format = "eps")
     if pass_ax is False:
         plt.show()
-        
-def plot_3D(neuron) :
-    loc = neuron.location
-    x = loc[0]
-    y = loc[1]
-    z = loc[2]
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.plot3D(x, y, z, 'red', linewidth="0.35")
+
+
+def rotation_matrix(axis, theta):
+    """
+    Return the rotation matrix associated with counterclockwise
+    rotation about the given axis by theta radians.
+    
+    Credit: https://stackoverflow.com/questions/6802577/
+    rotation-of-3d-vector
+
+    """
+    axis = np.asarray(axis)
+    axis = axis/math.sqrt(np.dot(axis, axis))
+    a = math.cos(theta/2.0)
+    b, c, d = -axis*math.sin(theta/2.0)
+    aa, bb, cc, dd = a*a, b*b, c*c, d*d
+    bc, ad, ac, ab, bd, cd = b*c, a*d, a*c, a*b, b*d, c*d
+    return np.array([[aa+bb-cc-dd, 2*(bc+ad), 2*(bd-ac)],
+                     [2*(bc-ad), aa+cc-bb-dd, 2*(cd+ab)],
+                     [2*(bd+ac), 2*(cd-ab), aa+dd-bb-cc]])
+
+
+def plot_3D(neuron):
+    import plotly
+    import plotly.plotly as py
+    import plotly.graph_objs as go
+    N=neuron.n_node
+
+    Xe=[]
+    Ye=[]
+    Ze=[]
+    for e in range(1, N):
+        parent = neuron.parent_index[e]
+        Xe+=[neuron.location[0, e],neuron.location[0, parent], None]
+        Ye+=[neuron.location[1, e],neuron.location[1, parent], None]
+        Ze+=[neuron.location[2, e],neuron.location[2, parent], None]
+
+    trace1=go.Scatter3d(x=Xe,
+                   y=Ye,
+                   z=Ze,
+                   mode='lines',
+                   line=dict(color='rgb(125,125,125)', width=1),
+                   hoverinfo='none'
+                   )
+    trace2=go.Scatter3d(x=np.zeros(N),
+                   y=np.zeros(N),
+                   z=np.zeros(N),
+                   mode='markers',
+                   name='actors',
+                   marker=dict(symbol='dot',
+                                 size=6,
+                                 colorscale='Viridis',
+                                 line=dict(color='rgb(50,50,50)', width=0.5)
+                                 ),
+                   hoverinfo='text'
+                   )
+    axis=dict(showbackground=False,
+              showline=False,
+              zeroline=False,
+              showgrid=False,
+              showticklabels=False,
+              title=''
+              )
+
+
+    layout = go.Layout(
+             width=500,
+             height=500,
+             showlegend=False,
+             scene=dict(
+                 xaxis=dict(axis),
+                 yaxis=dict(axis),
+                 zaxis=dict(axis),
+            ),
+         margin=dict(
+            t=100
+        ),
+        hovermode='closest',
+        annotations=[
+               dict(
+               showarrow=False,
+                xref='paper',
+                yref='paper',
+                x=0,
+                y=0.1,
+                xanchor='left',
+                yanchor='bottom',
+                font=dict(
+                size=14
+                )
+                )
+            ],    )
+
+    data=[trace1, trace2]
+    fig=go.Figure(data=data, layout=layout)
+
+    return py.iplot(fig)
 
 def plot_evolution_mcmc(mcmc):
     """

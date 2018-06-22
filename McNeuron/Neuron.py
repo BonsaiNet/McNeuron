@@ -769,6 +769,23 @@ class Neuron:
         A[A != 0] = 1.
         B = np.eye(subset.shape[0]) - inv(A)
         return subset[np.where(B==1)[1]]
+    
+    def get_rest_of_neuron_after_node(self, node):
+        le = preprocessing.LabelEncoder()
+        index = self.connecting_after_node(node)
+        le.fit(index)
+        le.transform(index) 
+        n_node = len(index)
+        swc=np.zeros([n_node, 7])
+        swc[:, 0] = np.arange(n_node)
+        swc[:, 1] = self.nodes_type[index]
+        swc[:, 2] = self.location[0, index]
+        swc[:, 3] = self.location[1, index]
+        swc[:, 4] = self.location[2, index]
+        swc[:, 5] = self.diameter[index]
+        swc[1:,6] = le.transform(self.parent_index[index[1:]]) + 1
+        swc[0, 6] = -1
+        return swc
 
     def distance(self, index1, index2):
         """
