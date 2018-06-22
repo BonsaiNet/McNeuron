@@ -290,7 +290,7 @@ def plot_2D(neuron,
    
     # Making line for each edge
     for i in range(n_node):
-        if len(np.where(red_index==i)[0])>0:
+        if bool(np.isin(i , red_index)):
             colors.append('r')
         else:
             colors.append('k')

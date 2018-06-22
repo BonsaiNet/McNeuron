@@ -17,7 +17,6 @@ class Neuron:
     def __init__(self, input_file=None):
         """
         Making an Neuron object by inserting swc txt file or numpy array.
-
         Parameters:
         -----------
         input_file:
@@ -47,7 +46,6 @@ class Neuron:
         Reads matrix of swc format and asign these attributes:
         n_soma, n_node, nodes_list, location, nodes_type
         diameter, parent_index
-
         Parameters
         ----------
         input_file: numpy of shape [n, 7]
@@ -103,10 +101,14 @@ class Neuron:
         elif name == 'mcmc':
             self.mcmc_features()
         elif name == 'l_measure':
-            self.L_measure_features()
+            self.l_measure_features()
         elif name == 'motif':
+            self.mcmc_features()
+        elif name == 'all':
+            self.geometrical_features()
+            self.toy_mcmc_features()
             self.motif_features()
-        #self.geometrical_features()
+            self.l_measure_features()
 
     def basic_features(self):
         """
@@ -200,7 +202,6 @@ class Neuron:
             nodes_diameter
             parent_index
             location
-
         ext_red_list : array of shape = [3, n_node]
             first row: end points and order one nodes (for extension)
             second row: end points (for removing)
@@ -248,7 +249,7 @@ class Neuron:
         branch_angle, side_angle = self.branch_angle(branch_order)
         curvature = self.set_curvature()
         #fractal = self.set_discrepancy(np.arange(.01, 5,.01))
-        main, parent_critical_point, path_length_critical, euclidean = \
+        self.main, self.parent_critical_point, path_length_critical, euclidean = \
             self.get_neural_and_euclid_lenght_critical_point(branch_order, distance_from_parent)
 
         self.features['global angle'] = global_angle[self.n_soma:]
@@ -277,7 +278,7 @@ class Neuron:
         #self.features['mean segmental neuronal/euclidean'] = \
         #   np.array([np.sqrt(((self.features['neuronal/euclidean for segments'] - 1.)**2).mean())])
         self.features['segmental branch angle'] = \
-           self.set_branch_angle_segment(main, parent_critical_point)
+           self.set_branch_angle_segment(self.main, self.parent_critical_point)
 
 
     def neural_distance_from_root(self, distance_from_parent):
@@ -391,7 +392,6 @@ class Neuron:
     def imagary(self, bins=10, projection=[0,1,2], nodes_type='all'):
         """
         Imaging neuron on a lattice of given size.
-
         Parameters:
         -----------
         bins: int or list
@@ -402,12 +402,10 @@ class Neuron:
             to 'x', 'y' and 'z'.
         nodes_type: str
             it can be 'all', 'tips', 'branches' and 'tips and branches'
-
         Returns:
         --------
         image: numpy
             An array that shows the density of neuron in different locations.
-
         """
         dim = len(projection)
         if isinstance(bins, int):
@@ -435,7 +433,6 @@ class Neuron:
         """
         Counting the number of occupied boxes, when the location of neuron is approximated by
         equal boxes
-
         Parameters:
         -----------
         box_length: list (or numpy) of positive numbers
@@ -446,7 +443,6 @@ class Neuron:
             to 'x', 'y' and 'z'.
         nodes_type: str
             it can be 'all', 'tips', 'branches' and 'tips and branches'
-
         Return:
         -------
         precentage_list: numpy
@@ -467,7 +463,6 @@ class Neuron:
                nodes_type='all'):
         """
         Approximating the location of a neuron by equal sized boxes.
-
         Parameters:
         -----------
         box_length: float > 0
@@ -479,7 +474,6 @@ class Neuron:
             to 'x', 'y' and 'z'.
         nodes_type: str
             it can be 'all', 'tips', 'branches' and 'tips and branches'
-
         Returns:
         --------
         box: numpy
@@ -496,7 +490,6 @@ class Neuron:
     def projection_tips(self, projection, nodes_type='all'):
         """
         Retrning the location of the neuron (or its tips) for given projection.
-
         Parameters:
         -----------
         projection: list
@@ -504,7 +497,6 @@ class Neuron:
             to 'x', 'y' and 'z'.
         nodes_type: str
             it can be 'all', 'tips', 'branches' and 'tips and branches'
-
         """
         self.set_branch_order()
         if nodes_type=='all':
@@ -524,20 +516,17 @@ class Neuron:
         """
         Returning frequency of the number boxes that contain different number of nodes,
         When neuron is approximated by the boxes of given length.
-
         Parameters:
         -----------
         box_length: float > 0
             the length of box.
         nodes_type: str
             it can be 'all', 'tips', 'branches' and 'tips and branches'
-
         Return:
         -------
         n_box_vs_containing: numpy
             an array that at location k says how many boxes contain exatly k nodes of neuron
             (for 0 <= k <=  maximum number of nodes of neuron that a box can contain)
-
         """
         nodes_in_boxes = self.boxing(box_length=box_length,
                                      return_counts=True,
@@ -582,7 +571,6 @@ class Neuron:
         point Second and third rows are the angle betwen two outward segments
         and previous segment at the branching in arbitrary order (nan at other
         nodes).
-
         dependency:
             tree_util.branch_order
             self.location
@@ -714,7 +702,6 @@ class Neuron:
         size [n_node, n_node]. The element (i,j) is not np.nan if node i is a
         decendent of node j. The value at this array is the distance of j to
         its parent.
-
         dependency:
             self.nodes_list
             self.n_soma
@@ -782,11 +769,27 @@ class Neuron:
         A[A != 0] = 1.
         B = np.eye(subset.shape[0]) - inv(A)
         return subset[np.where(B==1)[1]]
+    
+    def get_rest_of_neuron_after_node(self, node):
+        le = preprocessing.LabelEncoder()
+        index = self.connecting_after_node(node)
+        le.fit(index)
+        le.transform(index) 
+        n_node = len(index)
+        swc=np.zeros([n_node, 7])
+        swc[:, 0] = np.arange(n_node)
+        swc[:, 1] = self.nodes_type[index]
+        swc[:, 2] = self.location[0, index]
+        swc[:, 3] = self.location[1, index]
+        swc[:, 4] = self.location[2, index]
+        swc[:, 5] = self.diameter[index]
+        swc[1:,6] = le.transform(self.parent_index[index[1:]]) + 1
+        swc[0, 6] = -1
+        return swc
 
     def distance(self, index1, index2):
         """
         Neural distance between two nodes in the neuron.
-
         inputs
         ------
             index1, index2 : the indecies of the nodes.
@@ -831,11 +834,9 @@ class Neuron:
     def connecting_after_node(self, node_index):
         """
         Return the index of nodes after the given node toward the end nodes.
-
         Parameters
         ----------
         node: Node
-
         Returns
         -------
         index: numpy array
@@ -857,23 +858,6 @@ class Neuron:
         distance_from_root = self.distance_from_root()
         diameter_euclidean = self.diameter_euclidean(distance_from_root, bins=10)
         self.features['diameter euclidean (bins)'] = diameter_euclidean
-
-    def get_rest_of_neuron_after_node(self, node):
-        le = preprocessing.LabelEncoder()
-        index = self.connecting_after_node(node)
-        le.fit(index)
-        le.transform(index) 
-        n_node = len(index)
-        swc=np.zeros([n_node, 7])
-        swc[:, 0] = np.arange(n_node)
-        swc[:, 1] = self.nodes_type[index]
-        swc[:, 2] = self.location[0, index]
-        swc[:, 3] = self.location[1, index]
-        swc[:, 4] = self.location[2, index]
-        swc[:, 5] = self.diameter[index]
-        swc[1:,6] = le.transform(self.parent_index[index[1:]]) + 1
-        swc[0, 6] = -1
-        return swc
 
     def l_measure_features(self):
         """
@@ -1021,6 +1005,7 @@ class Neuron:
         n = np.append(n,self.features['Skewness X'])
         n = np.append(n,self.features['Skewness Y'])
         n = np.append(n,self.features['Skewness Z'])
+        n = np.append(n,self.features['Euclidain Skewness'])
         n = np.append(n,self.features['Length'])
         n = np.append(n,self.features['Surface Area'])
         n = np.append(n,self.features['Section Area'])
@@ -1028,7 +1013,6 @@ class Neuron:
         n = np.append(n,self.features['Average Radius'])
         n = np.append(n,self.features['Tips'])
         n = np.append(n,self.features['Stems'])
-        n = np.append(n,self.features['Euclidain Skewness'])
         n = np.append(n,self.features['Branch Pt'])
         n = np.append(n,self.features['Segments'])
         e = np.histogram(self.features['Elevation'], range=(-np.pi/2, np.pi/2), bins=10)[0]
@@ -1040,7 +1024,6 @@ class Neuron:
         
         return n
         
-    
     def toy_mcmc_features(self):
         self.set_branch_order()
         distance_from_parent = self.distance_from_parent()
@@ -1051,3 +1034,13 @@ class Neuron:
         self.features['mean Contraction'] = \
            np.array([((self.features['path_length/euclidean'] - 1.)).mean()])     
         self.features['Branch Pt'] = np.array([len(num_branches)])
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
