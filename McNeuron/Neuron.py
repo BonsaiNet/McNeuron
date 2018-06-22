@@ -880,46 +880,166 @@ class Neuron:
         Measuring all the L-measure features of neuron.
         Ref: https://www.nature.com/articles/nprot.2008.51
         and http://farsight-toolkit.org/wiki/L_Measure_functions
-
         L-measure consists of following measures:
         """
-        soma_indices = np.where(self.node_type==1)[0]
+        soma_indices = np.where(self.nodes_type==1)[0]
+        self.basic_features()
         self.set_branch_order()
-        branch_branch, branch_die, die_die, branching_stems = \
-            self.branching_type(main, parent_critical_point)
-        (num_branches,) = np.where(self.features['branch order'][self.n_soma:] >= 2)
-        (tips,) = np.where(self.features['branch order'][self.n_soma:] == 0)
 
         self.features['Width X'] = max(self.location[0,:]) - min(self.location[0,:])
         self.features['Heigth Y'] = max(self.location[1,:]) - min(self.location[1,:])
         self.features['Depth Z'] = max(self.location[2,:]) - min(self.location[2,:])
-        self.features['Soma X Position'] = self.location[0,0]
-        self.features['Soma Y Position'] = self.location[1,0]
-        self.features['Soma Z Position'] = self.location[2,0]
+        self.features['Soma X Position'] = self.somaPos(self.location[0][:], soma_indices)
+        self.features['Soma Y Position'] = self.somaPos(self.location[1][:], soma_indices)
+        self.features['Soma Z Position'] = self.somaPos(self.location[2][:], soma_indices)
         self.features['Soma Radii'] = self.diameter[soma_indices].mean()
-        ## need to be corrected
-        self.features['Soma Surface Area'] = np.power(self.diameter[soma_indices],2).mean()
-        self.features['Soma Volume'] = np.power(self.diameter[soma_indices], 3).mean()
-        self.features['Skewness X'] = self.location[0,:].mean() - self.location[0,0]
-        self.features['Skewness Y'] = self.location[1,:].mean() - self.location[1,0]
-        self.features['Skewness Z'] = self.location[2,:].mean() - self.location[2,0]
-        self.features['Euclidain Skewness'] = \
-            np.sqrt(sum(self.features['Skewness X']**2 + \
-            self.features['Skewness Y']**2 + \
-            self.features['Skewness Z']))
-        self.features['Stems'] = self.branch_order[0]
-        self.features['Branching Stems'] = branching_stems
-        self.features['Branch Pt'] = np.array([len(num_branches)])
-        ## NOT CLEAR
-        self.features['Segments'] = 1
-        self.features['Tips'] = np.array([len(tips)])
-        self.features['Length'] = 1
-        self.features['Surface Area'] = 1
-        self.features['Volume'] = 1
-        self.features['Burke Taper'] = 1
-        self.features['Hillman Taper'] = 1
-        self.features['Volume'] = 1
+        self.features['Soma Surface Area'] = self.somaSurfaceArea(soma_indices)
+        self.features['Soma Volume'] = self.somaVolume(soma_indices)
+        self.features['Skewness X'] = np.abs(self.location[0,:].mean() - self.features['Soma X Position'])
+        self.features['Skewness Y'] = np.abs(self.location[1,:].mean() - self.features['Soma Y Position'])
+        self.features['Skewness Z'] = np.abs(self.location[2,:].mean() - self.features['Soma Z Position'])
+        self.features['Length'] = self.totalLength()
+        self.features['Surface Area'] = self.surfaceArea()
+        self.features['Section Area'] = self.sectionArea()
+        self.features['Volume'] = self.volume()
         self.features['Average Radius'] = self.diameter.mean()
+        self.features['Tips'] = np.shape(np.where(self.features['branch order'][self.n_soma:] == 0))[1]
+        self.features['Stems'] = int(self.features['branch order'][0] - len(soma_indices) + 1)
+        self.features['Euclidain Skewness'] = np.sqrt(np.square(self.location[0,:].mean() - self.features['Soma X Position']) + np.square(self.location[1,:].mean() - self.features['Soma Y Position']) + np.square(self.location[2,:].mean() - self.features['Soma Z Position']))
+        self.features['Branch Pt'] = np.shape(np.where(self.features['branch order'][self.n_soma:] >= 2))[1]
+        self.features['Segments'] = self.features['Branch Pt'] * 2
+        self.features['Branching Indices'] = self.branchingIndices(np.where(self.features['branch order'] == 2)[0])
+        self.features['Elevation'] = self.elevation(self.features['Branching Indices'])
+        self.features['Tilt Local'] = self.tiltLocal(self.features['Branching Indices'])
+        self.features['Amplitude Local'] = self.amplitudeLocal(self.features['Tilt Local'])
+    
+    def somaPos(self, a, soma_indices) :
+        sum = 0
+        for i in range(0,len(soma_indices)) :
+            sum = sum + a[soma_indices[i]]
+        return sum/len(soma_indices)
+        
+    def totalLength(self) :
+        length = 0
+        for i in range (0,np.shape(self.location[0])[0]) :
+            pI = int(self.parent_index[i])
+            if(pI != -1) :
+                length = length + np.sqrt(np.square(self.location[0][pI]-self.location[0][i]) + np.square(self.location[1][pI]-self.location[1][i]) + np.square(self.location[2][pI]-self.location[2][i]))       
+        return length
+    
+    def somaSurfaceArea(self, soma_indices) :
+        sA = 0
+        for i in range (1,np.shape(soma_indices)[0]) :
+            pI = int(self.parent_index[soma_indices[i]])
+            if(pI != -1) :
+                h = np.sqrt(np.square(self.location[0][pI]-self.location[0][soma_indices[i]]) + np.square(self.location[1][pI]-self.location[1][soma_indices[i]]) + np.square(self.location[2][pI]-self.location[2][soma_indices[i]]))       
+                sA = sA + 2*np.pi*self.diameter[soma_indices[i]]*h
+        return sA
+    
+    def somaVolume(self, soma_indices) :
+        v = 0
+        for i in range (1,np.shape(soma_indices)[0]) :
+            pI = int(self.parent_index[soma_indices[i]])
+            if(pI != -1) :
+                h = np.sqrt(np.square(self.location[0][pI]-self.location[0][soma_indices[i]]) + np.square(self.location[1][pI]-self.location[1][soma_indices[i]]) + np.square(self.location[2][pI]-self.location[2][soma_indices[i]]))       
+                v = v + np.pi*np.square(self.diameter[soma_indices[i]])*h
+        return v
+    
+    def surfaceArea(self) :
+        sA = 0
+        for i in range (1,np.shape(self.location[0])[0]) :
+            pI = int(self.parent_index[i])
+            if(pI != -1) :
+                h = np.sqrt(np.square(self.location[0][pI]-self.location[0][i]) + np.square(self.location[1][pI]-self.location[1][i]) + np.square(self.location[2][pI]-self.location[2][i]))       
+                sA = sA + 2*np.pi*self.diameter[i]*h
+        return sA
+    
+    def sectionArea(self) :
+        sA = 0
+        for i in range (1,np.shape(self.location[0])[0]) :
+            pI = int(self.parent_index[i])
+            if(pI != -1) :      
+                sA = sA + np.pi*np.square(self.diameter[i])
+        return sA
+    
+    def volume(self) :
+        v = 0
+        for i in range (1,np.shape(self.location[0])[0]) :
+            pI = int(self.parent_index[i])
+            if(pI != -1) :
+                h = np.sqrt(np.square(self.location[0][pI]-self.location[0][i]) + np.square(self.location[1][pI]-self.location[1][i]) + np.square(self.location[2][pI]-self.location[2][i]))       
+                v = v + np.pi*np.square(self.diameter[i])*h
+        return v
+    
+    def branchingIndices(self, branchPt) :
+        z = []
+        for i in range (0,len(self.parent_index)) :
+            for j in range(0,len(branchPt)) :
+                if self.parent_index[i] == branchPt[j] :
+                    z = np.append(z, i)
+        return z
+
+    def elevation(self, branchingIndices) :
+        e = [0] * np.shape(branchingIndices)[0]
+        for i in range (1,np.shape(e)[0]) :
+            bI = int(branchingIndices[i])
+            pI = int(self.parent_index[bI])
+            if(pI != -1) :
+                b = np.sqrt(np.square(self.location[0][bI]-self.location[0][pI]) + np.square(self.location[2][bI]-self.location[2][pI]))
+                h = self.location[1][bI] - self.location[1][pI]
+                e[i] = np.arctan(h/b)
+        return e
+    
+    def tiltLocal(self, branchingIndices) :
+        t = [0] * np.shape(branchingIndices)[0]
+        for i in range (1,np.shape(t)[0]) :
+            bI = int(branchingIndices[i])
+            pI = int(self.parent_index[bI])
+            if(pI != -1) :
+                b = self.location[0][bI]-self.location[0][pI]
+                h = self.location[2][bI]-self.location[2][pI]
+                t[i] = np.arctan(h/b)
+        return t
+    
+    def amplitudeLocal(self, tiltLocal) :
+        a = [0] * int(np.shape(tiltLocal)[0] / 2)
+        for i in range (0,np.shape(a)[0]) :
+            a[i] = max([np.abs(tiltLocal[2*i] + tiltLocal[2*i+1]),np.abs(tiltLocal[2*i] - tiltLocal[2*i+1])])
+        return a
+    
+    def getNeuronVector(self) :
+        n=[]
+        n = np.append(n,self.features['Width X'])
+        n = np.append(n,self.features['Heigth Y'])
+        n = np.append(n,self.features['Depth Z'])
+        n = np.append(n,self.features['Soma X Position'])
+        n = np.append(n,self.features['Soma Y Position'])
+        n = np.append(n,self.features['Soma Z Position'])
+        n = np.append(n,self.features['Soma Radii'])
+        n = np.append(n,self.features['Soma Surface Area'])
+        n = np.append(n,self.features['Soma Volume'])
+        n = np.append(n,self.features['Skewness X'])
+        n = np.append(n,self.features['Skewness Y'])
+        n = np.append(n,self.features['Skewness Z'])
+        n = np.append(n,self.features['Length'])
+        n = np.append(n,self.features['Surface Area'])
+        n = np.append(n,self.features['Section Area'])
+        n = np.append(n,self.features['Volume'])
+        n = np.append(n,self.features['Average Radius'])
+        n = np.append(n,self.features['Tips'])
+        n = np.append(n,self.features['Stems'])
+        n = np.append(n,self.features['Euclidain Skewness'])
+        n = np.append(n,self.features['Branch Pt'])
+        n = np.append(n,self.features['Segments'])
+        e = np.histogram(self.features['Elevation'], range=(-np.pi/2, np.pi/2), bins=10)[0]
+        t = np.histogram(self.features['Tilt Local'], range=(-np.pi/2, np.pi/2), bins=10)[0]
+        a = np.histogram(self.features['Amplitude Local'], range=(0, np.pi), bins = 10)[0]
+        n = np.append(n, (e/sum(e)))
+        n = np.append(n, (t/sum(t)))
+        n = np.append(n, (a/sum(a)))
+        
+        return n
+        
     
     def toy_mcmc_features(self):
         self.set_branch_order()
