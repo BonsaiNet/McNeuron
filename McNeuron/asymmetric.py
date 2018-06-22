@@ -1358,7 +1358,7 @@ def logp_vector(trees, all_same_mat,
         itr += 1
         
     min_index = np.argmin(prob_value)
-    print prob_value[min_index]
+    print(prob_value[min_index])
     paaa_ml = float(params['paaa'][min_index])
     paab_ml = float(params['paab'][min_index])
     pabb_ml = float(params['pabb'][min_index])
