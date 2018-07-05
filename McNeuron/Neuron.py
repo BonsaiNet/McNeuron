@@ -2102,20 +2102,20 @@ class Neuron:
         soma_indices = np.where(self.nodes_type==1)[0]
         self.basic_features()
         
-        depth = embedded[:,2].max() - embedded[:,2].min()
+        depth = np.sqrt((location**2).sum(axis=0)).max()
         self.features['Width X'] = (embedded[:,0].max() - embedded[:,0].min())/(depth)
         self.features['Height Y'] = (embedded[:,1].max() - embedded[:,1].min())/(depth)
         self.features['Soma Radii'] = (self.diameter[soma_indices].mean())/(depth)
-        self.features['Soma Surface Area'] = (self.somaSurfaceArea(soma_indices))/(self.features['Width X'] * depth)
-        self.features['Soma Volume'] = (self.somaVolume(soma_indices))/(self.features['Width X'] * self.features['Height Y'] * depth)
+        self.features['Soma Surface Area'] = (self.somaSurfaceArea(soma_indices))/(depth**2)
+        self.features['Soma Volume'] = (self.somaVolume(soma_indices))/(depth**3)
         self.features['Skewness X'] = (np.abs(self.location[0,:].mean()))/(depth)
         self.features['Skewness Y'] = (np.abs(self.location[1,:].mean()))/(depth)
         self.features['Skewness Z'] = (np.abs(self.location[2,:].mean()))/(depth)
         self.features['Euclidian Skewness'] = (np.sqrt(np.square(self.location[0,:].mean()) + np.square(self.location[1,:].mean()) + np.square(self.location[2,:].mean())))/(depth)
         self.features['Length'] = (self.totalLength())/(depth)
-        self.features['Surface Area'] = (self.surfaceArea())/(self.features['Width X'] * depth)
-        self.features['Section Area'] = (np.sum(np.pi*(self.diameter[1:]**2)))/(self.features['Width X'] * depth)
-        self.features['Volume'] = (self.volume())/(self.features['Width X'] * self.features['Height Y'] * depth)
+        self.features['Surface Area'] = (self.surfaceArea())/(depth**2)
+        self.features['Section Area'] = (np.sum(np.pi*(self.diameter[1:]**2)))/(depth**2)
+        self.features['Volume'] = (self.volume())/(depth**3)
         self.features['Average Radius'] = (self.diameter.mean())/(depth)
         
         self.features['Tips'] = np.shape(np.where(self.features['branch order'][self.n_soma:] == 0))[1]
