@@ -2066,7 +2066,6 @@ class Neuron:
         
         n = np.append(n,self.features['global angle'].mean())
         n = np.append(n,self.features['local angle'].mean())
-        n = np.append(n,self.features['distance from parent'].mean())
         n = np.append(n,self.features['distance from root'].mean())
         n = np.append(n,self.features['path_length/euclidean'].mean())
         n = np.append(n,self.features['mean Contraction'])
