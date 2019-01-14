@@ -6,7 +6,6 @@ import matplotlib.colors as colors
 import matplotlib.cm as cm
 import matplotlib.animation as animation
 import pylab as pl
-from PIL import Image
 from numpy.linalg import inv
 import matplotlib
 from matplotlib import collections as mc
@@ -379,7 +378,7 @@ def plot_3D(neuron):
                    y=Ye,
                    z=Ze,
                    mode='lines',
-                   line=dict(color='rgb(125,125,125)', width=1),
+                   line=dict(color='rgb(0,0,0)', width=1),
                    hoverinfo='none'
                    )
     trace2=go.Scatter3d(x=np.zeros(N),
