@@ -160,9 +160,11 @@ class Neuron:
         self.features['branch branch depth'] = branch_branch_depth
         self.features['branch die depth'] = branch_die_depth
         self.features['die die depth'] = die_die_depth
-        self.features['branching stems'] = np.array([branching_stems])
+        self.features['branching stems'] = np.array(self.features['branch order'][0])
         self.features['all non trivial initials'] =\
-            np.array([self.all_non_trivial_initials()])
+            self.features['branch branch depth'][1] + \
+                self.features['branch die depth'][1] + \
+                self.features['die die depth'][1]
         
         #a = float(self.features['die die']*self.features['branch branch'])
     #         asym = 0
@@ -963,25 +965,25 @@ class Neuron:
     
     def getNeuronVector(self) :
         n=[]
-        n = np.append(n,self.features['Width X'])
-        n = np.append(n,self.features['Height Y'])
-        n = np.append(n,self.features['Depth Z'])
-        n = np.append(n,self.features['Soma Radii'])
-        n = np.append(n,self.features['Soma Surface Area'])
-        n = np.append(n,self.features['Soma Volume'])
-        n = np.append(n,self.features['Skewness X'])
-        n = np.append(n,self.features['Skewness Y'])
-        n = np.append(n,self.features['Skewness Z'])
-        n = np.append(n,self.features['Euclidian Skewness'])
-        n = np.append(n,self.features['Length'])
-        n = np.append(n,self.features['Surface Area'])
-        n = np.append(n,self.features['Section Area'])
-        n = np.append(n,self.features['Volume'])
-        n = np.append(n,self.features['Average Radius'])
-        n = np.append(n,self.features['Tips'])
-        n = np.append(n,self.features['Stems'])
-        n = np.append(n,self.features['Branch Pt'])
-        n = np.append(n,self.features['Segments'])
+        # n = np.append(n,self.features['Width X'])
+        # n = np.append(n,self.features['Height Y'])
+        # n = np.append(n,self.features['Depth Z'])
+        # n = np.append(n,self.features['Soma Radii'])
+        # n = np.append(n,self.features['Soma Surface Area'])
+        # n = np.append(n,self.features['Soma Volume'])
+        # n = np.append(n,self.features['Skewness X'])
+        # n = np.append(n,self.features['Skewness Y'])
+        # n = np.append(n,self.features['Skewness Z'])
+        # n = np.append(n,self.features['Euclidian Skewness'])
+        # n = np.append(n,self.features['Length'])
+        # n = np.append(n,self.features['Surface Area'])
+        # n = np.append(n,self.features['Section Area'])
+        # n = np.append(n,self.features['Volume'])
+        # n = np.append(n,self.features['Average Radius'])
+        # n = np.append(n,self.features['Tips'])
+        # n = np.append(n,self.features['Stems'])
+        # n = np.append(n,self.features['Branch Pt'])
+        # n = np.append(n,self.features['Segments'])
         #e = np.histogram(self.features['Elevation'], range=(-np.pi/2, np.pi/2), bins=10)[0]
         #t = np.histogram(self.features['Tilt Local'], range=(-np.pi/2, np.pi/2), bins=10)[0]
         #a = np.histogram(self.features['Amplitude Local'], range=(0, np.pi), bins = 10)[0]
@@ -2041,47 +2043,67 @@ class Neuron:
     
     def getNeuronVector(self) :
         n=[]
-        n = np.append(n,self.features['Width X'])
-        n = np.append(n,self.features['Height Y'])
-        n = np.append(n,self.features['Soma Radii'])
-        n = np.append(n,self.features['Soma Surface Area'])
-        n = np.append(n,self.features['Soma Volume'])
-        n = np.append(n,self.features['Skewness X'])
-        n = np.append(n,self.features['Skewness Y'])
-        n = np.append(n,self.features['Skewness Z'])
-        n = np.append(n,self.features['Euclidian Skewness'])
-        n = np.append(n,self.features['Length'])
-        n = np.append(n,self.features['Surface Area'])
-        n = np.append(n,self.features['Section Area'])
-        n = np.append(n,self.features['Volume'])
-        n = np.append(n,self.features['Average Radius'])
-        n = np.append(n,self.features['Tips'])
-        n = np.append(n,self.features['Stems'])
-        n = np.append(n,self.features['Branch Pt'])
-        n = np.append(n,self.features['Segments'])
+#         n = np.append(n,self.features['Width X'])
+#         n = np.append(n,self.features['Height Y'])
+#         n = np.append(n,self.features['Soma Radii'])
+#         n = np.append(n,self.features['Soma Surface Area'])
+#         n = np.append(n,self.features['Soma Volume'])
+#         n = np.append(n,self.features['Skewness X'])
+#         n = np.append(n,self.features['Skewness Y'])
+#         n = np.append(n,self.features['Skewness Z'])
+#         n = np.append(n,self.features['Euclidian Skewness'])
+#         n = np.append(n,self.features['Length'])
+#         n = np.append(n,self.features['Surface Area'])
+#         n = np.append(n,self.features['Section Area'])
+#         n = np.append(n,self.features['Volume'])
+#         n = np.append(n,self.features['Average Radius'])
+#         n = np.append(n,self.features['Tips'])
+#         n = np.append(n,self.features['Stems'])
+#         n = np.append(n,self.features['Branch Pt'])
+#         n = np.append(n,self.features['Segments'])
         
-        n = np.append(n,self.features['branch branch'])
-        n = np.append(n,self.features['branch die'])
-        n = np.append(n,self.features['die die'])
+#         n = np.append(n,self.features['branch branch'])
+#         n = np.append(n,self.features['branch die'])
+#         n = np.append(n,self.features['die die'])
         
-        n = np.append(n,self.features['global angle'].mean())
-        n = np.append(n,self.features['local angle'].mean())
-        n = np.append(n,self.features['distance from root'].mean())
-        n = np.append(n,self.features['path_length/euclidean'].mean())
-        n = np.append(n,self.features['mean Contraction'])
-        n = np.append(n,self.features['branch angle'].mean())
-        n = np.append(n,self.features['side branch angle'].mean())
-        n = np.append(n,self.features['mean segmental neural length'])
-        n = np.append(n,self.features['mean segmental euclidean length'])
-        n = np.append(n,self.features['segmental branch angle'].mean())
+#         n = np.append(n,self.features['global angle'].mean())
+#         n = np.append(n,self.features['local angle'].mean())
+#         n = np.append(n,self.features['distance from parent'].mean())
+#         n = np.append(n,self.features['distance from root'].mean())
+#         n = np.append(n,self.features['path_length/euclidean'].mean())
+#         n = np.append(n,self.features['mean Contraction'])
+#         n = np.append(n,self.features['branch angle'].mean())
+#         n = np.append(n,self.features['side branch angle'].mean())
+#         n = np.append(n,self.features['mean segmental neural length'])
+#         n = np.append(n,self.features['mean segmental euclidean length'])
+#         n = np.append(n,self.features['segmental branch angle'].mean())
         
+        f = self.features['segmental euclidean length']
+        if(not np.isnan(np.max(f))) :
+            f = f/f.max()
+        h = np.histogram(f, range=(0,1), bins=10)[0]
+        n = np.append(n,h/sum(h))
+        f = self.features['local angle']
+        h = np.histogram(f, range=(0,np.pi), bins=10)[0]
+        n = np.append(n,h/sum(h))
+        f = self.features['branch angle']
+        h = np.histogram(f, range=(0,np.pi), bins=10)[0]
+        n = np.append(n,h/sum(h))
         
-        #e = np.histogram(self.features['Elevation'], range=(-np.pi/2, np.pi/2), bins=10)[0]
-        #t = np.histogram(self.features['Tilt Local'], range=(-np.pi/2, np.pi/2), bins=10)[0]
-        #a = np.histogram(self.features['Amplitude Local'], range=(0, np.pi), bins = 10)[0]
-        #n = np.append(n, (e/sum(e)))
-        #n = np.append(n, (t/sum(t)))
-        #n = np.append(n, (a/sum(a)))
+        f = self.features['global angle']
+        h = np.histogram(f, range=(0,np.pi), bins=10)[0]
+        n = np.append(n,h/sum(h))
+        f = self.features['distance from root']
+        if(not np.isnan(np.max(f))) :
+            f = f/f.max()
+        h = np.histogram(f, range=(0,1), bins=10)[0]
+        n = np.append(n,h/sum(h))
+        f = self.features['path_length/euclidean']
+        if(not np.isnan(np.max(f))) :
+            f = f/f.max()
+        h = np.histogram(f, range=(0,1), bins=10)[0]
+        n = np.append(n,h/sum(h))
+        
         return n
     
     def setNormalizedFeatures(self) :
@@ -2101,20 +2123,20 @@ class Neuron:
         soma_indices = np.where(self.nodes_type==1)[0]
         self.basic_features()
         
-        depth = np.sqrt((location**2).sum(axis=0)).max()
+        depth = embedded[:,2].max() - embedded[:,2].min()
         self.features['Width X'] = (embedded[:,0].max() - embedded[:,0].min())/(depth)
         self.features['Height Y'] = (embedded[:,1].max() - embedded[:,1].min())/(depth)
         self.features['Soma Radii'] = (self.diameter[soma_indices].mean())/(depth)
-        self.features['Soma Surface Area'] = (self.somaSurfaceArea(soma_indices))/(depth**2)
-        self.features['Soma Volume'] = (self.somaVolume(soma_indices))/(depth**3)
+        self.features['Soma Surface Area'] = (self.somaSurfaceArea(soma_indices))/(self.features['Width X'] * depth)
+        self.features['Soma Volume'] = (self.somaVolume(soma_indices))/(self.features['Width X'] * self.features['Height Y'] * depth)
         self.features['Skewness X'] = (np.abs(self.location[0,:].mean()))/(depth)
         self.features['Skewness Y'] = (np.abs(self.location[1,:].mean()))/(depth)
         self.features['Skewness Z'] = (np.abs(self.location[2,:].mean()))/(depth)
         self.features['Euclidian Skewness'] = (np.sqrt(np.square(self.location[0,:].mean()) + np.square(self.location[1,:].mean()) + np.square(self.location[2,:].mean())))/(depth)
         self.features['Length'] = (self.totalLength())/(depth)
-        self.features['Surface Area'] = (self.surfaceArea())/(depth**2)
-        self.features['Section Area'] = (np.sum(np.pi*(self.diameter[1:]**2)))/(depth**2)
-        self.features['Volume'] = (self.volume())/(depth**3)
+        self.features['Surface Area'] = (self.surfaceArea())/(self.features['Width X'] * depth)
+        self.features['Section Area'] = (np.sum(np.pi*(self.diameter[1:]**2)))/(self.features['Width X'] * depth)
+        self.features['Volume'] = (self.volume())/(self.features['Width X'] * self.features['Height Y'] * depth)
         self.features['Average Radius'] = (self.diameter.mean())/(depth)
         
         self.features['Tips'] = np.shape(np.where(self.features['branch order'][self.n_soma:] == 0))[1]
@@ -2132,4 +2154,11 @@ class Neuron:
         self.features['mean Contraction'] = \
            np.array([((self.features['path_length/euclidean'] - 1.)).mean()])     
         self.features['Branch Pt'] = np.array([len(num_branches)])
+        
+        
+        
+        
+        
+        
+        
         
