@@ -64,41 +64,21 @@ def neuron_with_node_type(swc_matrix,
                 swc_matrix[parent_in_soma, 6] = 1
             soma = 0
         all_ind = [np.where(swc_matrix[:, 1] == i)[0] for i in index]
-        l = sum([np.sign(len(i)) for i in all_ind])
         nodes = np.sort(np.concatenate(all_ind))
-        subset = np.sort(np.append(soma, nodes))
-        labels_parent = np.unique(\
-            swc_matrix.astype(int)[swc_matrix.astype(int)[subset,6],1])
-        labels_parent = np.sort(\
-            np.delete(labels_parent, np.where(labels_parent==1)))
-        if len(nodes) == 0 or ~np.all(np.in1d(labels_parent, index)):
-            return 0
-        
-        else:
-            le = preprocessing.LabelEncoder()
-            parent_subset = swc_matrix[subset[1:],6].astype(int)-1
-            ## Chnaging the parent of the nodes that their immediate parents
-            ## are not in the index (we replace their parent by the first grand parent that are in the index).
-            out_parent = np.where(pd.Series(swc_matrix[parent_subset, 1]).isin(index)==False)[0]
-            for i in range(len(out_parent)):
-                cur_par = parent_subset[i]
-                type_cur_par = swc_matrix[cur_par, 1]
-                be_in_index = pd.Series(type_cur_par).isin(index)[0]
-                be_in_tree = pd.Series(cur_par).isin(subset)[0]
-                while (be_in_tree==False) and (be_in_index==False):
-                    cur_par = int(swc_matrix[cur_par,6]-1)
-                    type_cur_par = swc_matrix[cur_par, 1]
-                    be_in_index = pd.Series(type_cur_par).isin(index)[0]
-                    be_in_tree = pd.Series(cur_par).isin(subset)[0]
-                parent_subset[i] =  cur_par
-                
-                
-            le.fit(subset)
-            parent = le.transform(parent_subset)
-            new_swc = swc_matrix[subset,:]
-            new_swc[1:,6] = parent+1
-            new_swc[0,6] = -1
-            return new_swc
+        subset = np.sort(np.append(soma, nodes))        
+        parent = swc_matrix[:,6].astype(int) - 1
+        ## Changing the parent of the nodes that their immediate parents
+        ## are not in the index (we replace their parent by the first grand parent that are in the index).
+        while (len(set(parent[subset])-set(subset))!=0):
+            subset = np.union1d(parent[subset], subset)
+        parent_subset = swc_matrix[subset[1:],6].astype(int)-1
+        le = preprocessing.LabelEncoder()
+        le.fit(subset)
+        parent = le.transform(parent_subset)
+        new_swc = swc_matrix[subset,:]
+        new_swc[1:,6] = parent+1
+        new_swc[0,6] = -1
+        return new_swc
 
 def subsample_swc(swc_matrix,
               subsample_type='nothing',
