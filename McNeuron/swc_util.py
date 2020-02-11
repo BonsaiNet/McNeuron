@@ -110,7 +110,7 @@ def star_neuron(wing_number=3,
                 length=10,
                 orientation = np.array([1,0,0])):
     """
-    Make a star-wise neuron. The location of the root is origin.
+    Make a star-shape neuron. The location of the root is at the origin.
 
     Parameters:
     wing_number: int
