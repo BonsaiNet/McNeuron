@@ -1,4 +1,5 @@
 """Distance utility"""
+
 import numpy as np
 #np.random.seed(100)
 
