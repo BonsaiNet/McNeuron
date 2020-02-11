@@ -10,4 +10,6 @@ import McNeuron.prob_util
 import McNeuron.vis_features
 import McNeuron.data_util
 
-__version__ = '1.2'
+#import asymmetric
+
+__version__ = '1.3'
