@@ -790,6 +790,32 @@ class Neuron:
         swc[1:,6] = le.transform(self.parent_index[index[1:]]) + 1
         swc[0, 6] = -1
         return swc
+    def subsample(self, subsample_type='nothing', length = 1):
+        """
+        Parameters:
+        -----------
+        subsample_type: str
+            the type of subsample. It can be:
+            'nothing': doesn't change anything
+            'regular': just preserves the end points and the branching points
+            'straigthen': straigthens the neuron based on the length. it approximate
+            the segments such that the distance between two consequative nodes is around 
+            'length'. For more info check the function 'straigthen_segment'.            
+
+        length: float
+            the value to subsample the segment
+
+        Returns:    
+        --------
+        swc_matrix: the subsampled segments
+            it approximates the segment by the length 
+
+        """ 
+        swc = self.get_swc()
+        S = subsample.Subsample()
+        S.set_swc(swc)
+        S.fit()
+        return S.subsample(subsample_type=subsample_type, length = length)
 
     def distance(self, index1, index2):
         """
@@ -2155,10 +2181,74 @@ class Neuron:
            np.array([((self.features['path_length/euclidean'] - 1.)).mean()])     
         self.features['Branch Pt'] = np.array([len(num_branches)])
         
+    def add_children_indexes(self, max_children=5):
+        """
+        Creates two attributes of Neuron which give the index of each parent's children and the distance to each child
+
+        Dependency: load swc matrix, distance from parent
+
+        :return: self.children_index, self.children_distance
+        """
+        self.children_index = np.empty((max_children, self.n_node))
+        self.children_index[:] = np.nan
+        self.children_distance = np.empty((max_children, self.n_node))
+        self.children_distance[:] = np.nan
+
+        swc = self.get_swc()
+        parent_distance = self.distance_from_parent()
+
+        # For each parent, search the swc file for its children
+        for parent_idx in np.arange(0, self.n_node):
+            parent_node_num = parent_idx + 1 # 1 based whereas parent_idx is 0 based
+            children_idx = np.where(swc[:, 6] == parent_node_num)[0]
+            #children_node_nums = swc[children_idx, 0]
+            children_node_nums = children_idx + 1
+            self.children_index[0:len(children_idx), parent_idx] = children_node_nums
+
+            # For each child, find distance to the parent
+            for child_idx in np.arange(len(children_idx)):
+                self.children_distance[child_idx, parent_idx] = parent_distance[children_idx[child_idx]]
+
+        # Trim arrays
+        good_rows = np.logical_not(np.all(np.isnan(self.children_index), axis=1))
+        self.children_index = self.children_index[good_rows, :]
+        self.children_distance = self.children_distance[good_rows, :]
+
+    def add_distance_from_closest_tip(self):
+        # Initialize
+        self.distance_from_closest_tip = np.empty(self.n_node)
+        self.distance_from_closest_tip[:] = np.inf
+        distance_from_parent = self.distance_from_parent()
+
+        # Find all tips
+        tip_nodes = np.where(np.all(np.isnan(self.children_index), axis=0))[0]
+
+        # For each tip node
+        for tip_node in tip_nodes:  # already in 0 index
+            keep_going = True
+            node_idx = tip_node
+            self.distance_from_closest_tip[node_idx] = 0
+
+            # Until you encounter a parent who is already closer, keep going up
+            while keep_going:
+                # As long as you're not at the root node
+                if node_idx != 0:
+                    # Calculate distance from immediate parent to tip
+                    parent_idx = self.parent_index[node_idx]
+                    parent_dist_to_tip = self.distance_from_closest_tip[node_idx] + distance_from_parent[node_idx]
+
+                    # If new value of parent distance to tip is less than prior, replace
+                    if parent_dist_to_tip <= self.distance_from_closest_tip[parent_idx]:
+                        self.distance_from_closest_tip[parent_idx] = parent_dist_to_tip
+                        node_idx = parent_idx
+                    else:
+                        keep_going = False
+                else:
+                    keep_going = False        
         
         
         
         
         
         
-        
+      
