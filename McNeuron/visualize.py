@@ -17,6 +17,7 @@ from copy import deepcopy
 import McNeuron.tree_util
 import McNeuron.Neuron
 import McNeuron.subsample
+import matplotlib.colors as mcolors
 
 sys.setrecursionlimit(10000)
 
@@ -229,11 +230,44 @@ def generate_data(path, scale_depth, n_camrea, kappa):
                 Data.append(D)
     return Data
 
+def get_ancestors(parent_index, node):
+    """
+    Return the ancestors of a node on the neuron toward the root. 
+    
+    Parameters:
+    -----------
+    parent_index: numpy array
+        the parent index of the nodes
+        
+    nodes: int
+        Index of the node
+    
+    Returns:
+    --------
+    ancestors: list
+        the list of ancestors of the node.
+        
+    """
+
+    ancestors = []
+    ancestors.append(node)
+    par = node
+    while par!=0:
+        par = parent_index[par]
+        ancestors.append(par) 
+    return ancestors
+
+
 def plot_2D(neuron,
             show_width=False,
             show_soma=False,
-            line_width=1,
+            line_width=1,            
+            color_line_width=1,
+            color_range=['red', 'orange', 'gold', 'green', 'cyan',
+              'blue', 'violet', 'gray', 'pink', 'brown', 'magenta'],
             node_index_red_after=-1,
+            show_loop=[],
+            red_index=np.array([]),
             node_color=[],
             shift=(0, 0),
             scale=(1, 1),
@@ -241,17 +275,9 @@ def plot_2D(neuron,
             pass_ax=False,
             axis=[1,0,0],
             rotation=0,
-            ax=''):
-    """
-    Plotting a neuron. 
-    
-    Parameters:
-    -----------
-    neuron: numpy or Neuron object
-        If it is numpy it should have swc structure.
-        
-        
-    """
+            format_save='eps',
+            ax='',
+            title =''):
     if isinstance(neuron, np.ndarray):
         location = neuron[:,2:5].T
         widths= neuron[:,5]
@@ -272,7 +298,7 @@ def plot_2D(neuron,
     location[0, :] = location[0,:]-min(location[0,:])
     location[1, :] = location[1,:]-min(location[1,:])
     
-    colors = []
+    colors = n_node*['k']
     lines = []
     patches = []
     
@@ -282,18 +308,32 @@ def plot_2D(neuron,
         linewidths = widths*linewidths
 
     # Making red after a node
+    
     if node_index_red_after >=0:
-        red_index = neuron.connecting_after_node(node_index_red_after)
+        ancestors = []
+        par = node_index_red_after
+        
+        ancestors.append(par)
+        while par!=0:
+            par = neuron.parent_index[par]
+            ancestors.append(par)
+        red_index = np.array(ancestors)
+    if len(show_loop) <10:
+        color_range = list(mcolors.TABLEAU_COLORS.keys())
     else:
-        red_index=[]
-   
+        color_range = list(mcolors.TABLEAU_COLORS.keys()) + \
+        list(mcolors.CSS4_COLORS.keys())
+    if len(show_loop) >0:
+        
+        for i in range(len(show_loop)):
+            anc1 = get_ancestors(neuron.parent_index, show_loop[i][0])
+            anc2 = get_ancestors(neuron.parent_index, show_loop[i][1])
+            red_index = np.array(list(set(anc1)^set(anc2))).astype(int)
+            for j in red_index:
+                colors[j] = color_range[i]
+                linewidths[j] = color_line_width
     # Making line for each edge
     for i in range(n_node):
-        if bool(np.isin(i , red_index)):
-            colors.append('r')
-        else:
-            colors.append('k')
-            
         j = int(parent_index[i])
         lines.append([(location[0,i] + shift[0],
                        location[1,i] + shift[1]),
@@ -305,7 +345,7 @@ def plot_2D(neuron,
                            linewidths=linewidths,
                            color=colors)
     # Making Soma
-    for i in range(n_soma):
+    for i in range(n_node):
         x1 = location[0, i] + shift[0]
         y1 = location[1, i] + shift[1]
         r = widths[i]
@@ -319,24 +359,19 @@ def plot_2D(neuron,
     pa = PatchCollection(patches, cmap=matplotlib.cm.gray)
     pa.set_array(widths[0]*np.zeros(n_soma))
     
-    if pass_ax is False:
-        fig, ax = plt.subplots()
-        ax.add_collection(lc)
-        if(show_soma):
-            ax.add_collection(pa)
-        plt.axis('off')
-        plt.xlim((-.001, max(location[0,:])+.001))
-        plt.ylim((-.001, max(location[1,:])+.001))
-    else:
-        ax.add_collection(lc)
-        ax.axis('off')
-        ax.set_xlim((-.01,max(location[0,:])+.01))
-        ax.set_ylim((-.01,max(location[1,:])+.01))
-            
+    fig, ax = plt.subplots()
+    ax.add_collection(lc)
+    if(show_soma):
+        ax.add_collection(pa)
+
+    plt.axis('off')
+    plt.xlim((-.001, max(location[0,:])+.001))
+    plt.ylim((-.001, max(location[1,:])+.001))
+    plt.title(title)     
     if(len(save)!=0):
-        plt.savefig(save, format = "eps")
-    if pass_ax is False:
-        plt.show()
+        plt.savefig(save, format = format_save)
+    plt.show()
+        
 
 
 def rotation_matrix(axis, theta):
@@ -359,39 +394,48 @@ def rotation_matrix(axis, theta):
                      [2*(bd+ac), 2*(cd-ab), aa+dd-bb-cc]])
 
 
-def plot_3D(neuron):
+def plot_3D(neuron,
+            show_loop=[],
+            line_width=10,
+            color_line_width=30):
+    """
+    Plot 3D shape of neuron.
+    This 
+    """
     import plotly
     import plotly.plotly as py
     import plotly.graph_objs as go
+    
     N=neuron.n_node
+    if len(show_loop) <10:
+        color_range = list(mcolors.TABLEAU_COLORS.keys())
+    else:
+        color_range = list(mcolors.TABLEAU_COLORS.keys()) + \
+        list(mcolors.CSS4_COLORS.keys())    
+
 
     Xe=[]
     Ye=[]
     Ze=[]
-    for e in range(1, N):
+    for e in range(N):
         parent = neuron.parent_index[e]
         Xe+=[neuron.location[0, e],neuron.location[0, parent], None]
         Ye+=[neuron.location[1, e],neuron.location[1, parent], None]
         Ze+=[neuron.location[2, e],neuron.location[2, parent], None]
+    line=dict(color=['rgb(0, 0, 0)'], colorscale='Viridis', width=line_width)
+    
+    neurites=go.Scatter3d(x=Xe, y=Ye, z=Ze,
+                          mode='lines', 
+                          line = line)
 
-    trace1=go.Scatter3d(x=Xe,
-                   y=Ye,
-                   z=Ze,
-                   mode='lines',
-                   line=dict(color='rgb(0,0,0)', width=1),
-                   hoverinfo='none'
-                   )
-    trace2=go.Scatter3d(x=np.zeros(N),
-                   y=np.zeros(N),
-                   z=np.zeros(N),
-                   mode='markers',
-                   name='actors',
-                   marker=dict(symbol='dot',
-                                 size=6,
-                                 colorscale='Viridis',
+    
+    soma=go.Scatter3d(x=np.zeros(1), y=np.zeros(1), z=np.zeros(1),
+                      mode='markers',
+                      marker=dict(symbol='dot',
+                                 size=10,
+                                 colorscale='blue',
                                  line=dict(color='rgb(50,50,50)', width=0.5)
                                  ),
-                   hoverinfo='text'
                    )
     axis=dict(showbackground=False,
               showline=False,
@@ -403,8 +447,8 @@ def plot_3D(neuron):
 
 
     layout = go.Layout(
-             width=500,
-             height=500,
+             width=800,
+             height=800,
              showlegend=False,
              scene=dict(
                  xaxis=dict(axis),
@@ -425,12 +469,32 @@ def plot_3D(neuron):
                 xanchor='left',
                 yanchor='bottom',
                 font=dict(
-                size=14
+                size=1
                 )
                 )
             ],    )
 
-    data=[trace1, trace2]
+    data=[neurites, soma]
+    
+    if len(show_loop) >0:
+        for i in range(len(show_loop)):
+            Xe=[]
+            Ye=[]
+            Ze=[]
+            anc1 = get_ancestors(neuron.parent_index, show_loop[i][0])
+            anc2 = get_ancestors(neuron.parent_index, show_loop[i][1])
+            red_index = np.array(list(set(anc1)^set(anc2))).astype(int)
+            for j in red_index:
+                parent = neuron.parent_index[j]
+                Xe+=[neuron.location[0, j],neuron.location[0, parent], None]
+                Ye+=[neuron.location[1, j],neuron.location[1, parent], None]
+                Ze+=[neuron.location[2, j],neuron.location[2, parent], None]
+            line=dict(color=color_range[i],
+                          colorscale='Viridis',
+                          width=color_line_width)
+            data.append(go.Scatter3d(x=Xe, y=Ye, z=Ze,
+                          mode='lines', 
+                          line = line))
     fig=go.Figure(data=data, layout=layout)
 
     return py.iplot(fig)
