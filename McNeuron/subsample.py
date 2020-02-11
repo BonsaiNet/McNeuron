@@ -3,7 +3,7 @@ import numpy as np
 from numpy import linalg as LA
 from copy import deepcopy
 from sklearn import preprocessing
-import pandas as pd
+#import pandas as pd
 import McNeuron.tree_util as tree_util 
 
 
