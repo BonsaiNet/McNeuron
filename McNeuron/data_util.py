@@ -751,6 +751,29 @@ def clean_data(neuron_data):
     new_neuron_data["Average Rall Ratio"] = new_neuron_data["Average Rall\\'s Ratio"]
     return new_neuron_data
 
+def selection_util(neurons, labels):
+    List_all_labels = get_all_labels(neurons=neurons,
+                                labels = labels)
+    labels_encoder = preprocessing.LabelEncoder()
+    labels_encoder.fit(List_all_labels)
+
+    size = neurons.shape[0]
+    attribute_mat = csr_matrix((size, len(labels_encoder.classes_)))
+    for i in range(size):
+        if np.mod(i,100)==0:
+            print(i)
+        for name in labels:
+            label = neurons[name][i]
+            if isinstance(label, str):
+                index = labels_encoder.transform([name + ' : ' + label])[0]
+                attribute_mat[i, index]= 1
+            if isinstance(label, list):
+                for lab in label:
+                    index = labels_encoder.transform([name + ' : ' + lab])[0]
+                    attribute_mat[i, index]= 1
+    return labels_encoder, attribute_mat
+
+
 # def feature_ext(morph_data_label, str_to_float=0):
 #     """Turning each morphological feature in the neuromorpho to
 #     a number and returning the array of the features.
