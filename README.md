@@ -1,6 +1,8 @@
- # McNeuron: A Python Package to Utilize Neuron Morphology
+ # McNeuron
+ [![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)](https://github.com/BonsaiNet/McNeuron/blob/master/LICENSE)[![Gitter](https://badges.gitter.im/glm-tools/pyglmnet.svg)](https://gitter.im/McNeuron/Lobby)[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.1170488.svg)](https://doi.org/10.5281/zenodo.1170488)
+McNeuron is a Python Package to Utilize [Neuron Morphology](https://en.wikipedia.org/wiki/Neuromorphology). It can visualize neurons, extract their feature, and generate novel samples. 
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg?style=flat)](https://github.com/BonsaiNet/McNeuron/blob/master/LICENSE)[![Gitter](https://badges.gitter.im/glm-tools/pyglmnet.svg)](https://gitter.im/McNeuron/Lobby)[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.1170488.svg)](https://doi.org/10.5281/zenodo.1170488)
+
 
 
 ## Installation:
